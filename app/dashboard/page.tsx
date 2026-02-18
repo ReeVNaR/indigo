@@ -16,6 +16,9 @@ interface Order {
     amount: number;
     status: OrderStatus;
     isUrgent?: boolean;
+    quantity?: number;
+    orderDate?: string;
+    advancePaid?: number;
 }
 
 interface Customer {
@@ -142,27 +145,31 @@ export default function Dashboard() {
     const [newOrderForm, setNewOrderForm] = useState({
         customerName: '',
         clothType: '',
+        quantity: 1,
+        orderDate: new Date().toISOString().split('T')[0],
         deliveryDate: '',
         amount: '',
-        isUrgent: false,
-        status: 'Processing'
+        advancePaid: '',
+        status: 'Received',
+        isUrgent: false
     });
+
+    // Derived Balance
+    const remainingBalance = useMemo(() => {
+        const total = parseFloat(newOrderForm.amount) || 0;
+        const advance = parseFloat(newOrderForm.advancePaid) || 0;
+        return Math.max(0, total - advance);
+    }, [newOrderForm.amount, newOrderForm.advancePaid]);
 
     const [settingsForm, setSettingsForm] = useState({
         shopName: 'Indigo Denim & Copper',
         masterTailor: 'John Doe',
         phone: '(555) 012-3456',
-        currency: 'USD',
+        currency: 'INR',
         notifications: true
     });
 
-    const currencySymbols: Record<string, string> = {
-        'USD': '$',
-        'EUR': '€',
-        'GBP': '£',
-        'INR': '₹'
-    };
-    const currencySymbol = currencySymbols[settingsForm.currency] || '$';
+    const currencySymbol = '₹';
 
     const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -183,8 +190,11 @@ export default function Dashboard() {
             const newOrderPayload = {
                 customer_name: newOrderForm.customerName,
                 cloth_type: newOrderForm.clothType,
+                quantity: newOrderForm.quantity,
+                order_date: newOrderForm.orderDate,
                 delivery_date: newOrderForm.deliveryDate,
                 amount: parseFloat(newOrderForm.amount) || 0,
+                advance_paid: parseFloat(newOrderForm.advancePaid) || 0,
                 status: newOrderForm.status,
                 is_urgent: newOrderForm.isUrgent
             };
@@ -207,11 +217,24 @@ export default function Dashboard() {
                     deliveryDate: data.delivery_date,
                     amount: data.amount,
                     status: data.status as OrderStatus,
-                    isUrgent: data.is_urgent
+                    isUrgent: data.is_urgent,
+                    quantity: data.quantity,
+                    orderDate: data.order_date,
+                    advancePaid: data.advance_paid
                 };
                 setOrders([newOrder, ...orders]);
                 setIsNewOrderModalOpen(false);
-                setNewOrderForm({ customerName: '', clothType: '', deliveryDate: '', amount: '', isUrgent: false, status: 'Processing' });
+                setNewOrderForm({
+                    customerName: '',
+                    clothType: '',
+                    quantity: 1,
+                    orderDate: new Date().toISOString().split('T')[0],
+                    deliveryDate: '',
+                    amount: '',
+                    advancePaid: '',
+                    status: 'Received',
+                    isUrgent: false
+                });
             }
         } catch (error) {
             console.error('Error creating order:', error);
@@ -571,17 +594,7 @@ export default function Dashboard() {
                                                     </div>
                                                 </div>
 
-                                                <div className="grid grid-cols-2 gap-6">
-                                                    <div>
-                                                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Currency Symbol</label>
-                                                        <select value={settingsForm.currency} onChange={e => setSettingsForm({ ...settingsForm, currency: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-medium bg-white">
-                                                            <option value="USD">USD ($)</option>
-                                                            <option value="EUR">EUR (€)</option>
-                                                            <option value="GBP">GBP (£)</option>
-                                                            <option value="INR">INR (₹)</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
+                                                {/* Currency selection removed */}
                                             </div>
                                         </div>
                                     </div>
@@ -628,57 +641,220 @@ export default function Dashboard() {
 
             {/* New Order Modal */}
             {isNewOrderModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-[#fdfbf7] rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-white/10 relative animate-in zoom-in-95 duration-200">
-                        {/* Modal Selvedge Strip */}
-                        <div className="absolute left-[12px] top-0 bottom-0 z-20 h-full flex items-center justify-center w-[12px]">
-                            <div className="h-full w-[2px] bg-red-500 mx-[2px] opacity-90 box-border border-r border-l border-red-700"></div>
-                        </div>
-
-                        <div className="pl-12 pr-6 py-6">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-black text-gray-900 uppercase">Create New Order</h2>
-                                <button onClick={() => setIsNewOrderModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[#fffdf9] rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-white/50 relative animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="px-8 py-6 border-b border-orange-100/50 bg-white/50">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-slate-800">New Order</h2>
+                                    <p className="text-slate-500 text-sm mt-1">Create a new tailoring request for customer.</p>
+                                </div>
+                                <button onClick={() => setIsNewOrderModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
+                        </div>
 
-                            <form onSubmit={handleCreateOrder} className="space-y-4">
-                                <div>
-                                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Customer Name</label>
-                                    <input type="text" required value={newOrderForm.customerName} onChange={e => setNewOrderForm({ ...newOrderForm, customerName: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900" placeholder="e.g. John Doe" />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Cloth Type</label>
-                                        <input type="text" required value={newOrderForm.clothType} onChange={e => setNewOrderForm({ ...newOrderForm, clothType: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900" placeholder="e.g. Wool" />
+                        {/* Scrollable Form Content */}
+                        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8">
+                            <form id="new-order-form" onSubmit={handleCreateOrder}>
+                                {/* Customer Selection */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-orange-500 uppercase tracking-widest pb-2 border-b border-orange-100/50">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                        Customer Information
                                     </div>
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Delivery Date</label>
-                                        <input type="date" required value={newOrderForm.deliveryDate} onChange={e => setNewOrderForm({ ...newOrderForm, deliveryDate: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900" />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Amount ({currencySymbol})</label>
-                                        <input type="number" required min="0" step="0.01" value={newOrderForm.amount} onChange={e => setNewOrderForm({ ...newOrderForm, amount: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900" placeholder="0.00" />
-                                    </div>
-                                    <div className="flex items-end pb-3">
-                                        <label className="flex items-center cursor-pointer">
-                                            <input type="checkbox" checked={newOrderForm.isUrgent} onChange={e => setNewOrderForm({ ...newOrderForm, isUrgent: e.target.checked })} className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" />
-                                            <span className="ml-2 text-sm font-bold text-gray-700">Urgent Order?</span>
-                                        </label>
+                                    <div className="bg-white rounded-xl border border-stone-200 p-1.5 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-orange-100">
+                                        <input
+                                            type="text"
+                                            required
+                                            value={newOrderForm.customerName}
+                                            onChange={e => setNewOrderForm({ ...newOrderForm, customerName: e.target.value })}
+                                            className="w-full px-4 py-3 bg-transparent outline-none text-slate-800 font-medium placeholder:text-slate-400"
+                                            placeholder="Enter customer name..."
+                                        />
                                     </div>
                                 </div>
 
-                                <div className="pt-4">
-                                    <button type="submit" className="w-full py-3 bg-gray-900 text-white font-bold rounded-lg hover:bg-black transition-colors shadow-lg uppercase tracking-wider">
-                                        Confirm Order
-                                    </button>
+                                {/* Item Details */}
+                                <div className="pt-2 space-y-4">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-orange-500 uppercase tracking-widest pb-2 border-b border-orange-100/50">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 011 12V7a4 4 0 014-4z" /></svg>
+                                        Item Details
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-6">
+                                        <div className="col-span-2">
+                                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Cloth Type</label>
+                                            <div className="relative">
+                                                <select
+                                                    value={newOrderForm.clothType}
+                                                    onChange={e => setNewOrderForm({ ...newOrderForm, clothType: e.target.value })}
+                                                    className="w-full appearance-none bg-white border border-stone-200 text-slate-800 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-3 pr-8 shadow-sm"
+                                                >
+                                                    <option value="" disabled>Select cloth type</option>
+                                                    <option value="Premium Italian Wool">Premium Italian Wool</option>
+                                                    <option value="Egyptian Cotton">Egyptian Cotton</option>
+                                                    <option value="Linen Blend">Linen Blend</option>
+                                                    <option value="Silk">Silk</option>
+                                                    <option value="Denim">Denim</option>
+                                                </select>
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Quantity</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={newOrderForm.quantity}
+                                                    onChange={e => setNewOrderForm({ ...newOrderForm, quantity: parseInt(e.target.value) || 1 })}
+                                                    className="bg-white border border-stone-200 text-slate-800 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-3 shadow-sm"
+                                                />
+                                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400 text-sm font-medium">
+                                                    pcs
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Schedule */}
+                                <div className="pt-2 space-y-4">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-orange-500 uppercase tracking-widest pb-2 border-b border-orange-100/50">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                        Schedule
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Order Date</label>
+                                            <input
+                                                type="date"
+                                                value={newOrderForm.orderDate}
+                                                onChange={e => setNewOrderForm({ ...newOrderForm, orderDate: e.target.value })}
+                                                className="bg-white border border-stone-200 text-slate-800 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-3 shadow-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Delivery Date</label>
+                                            <input
+                                                type="date"
+                                                required
+                                                value={newOrderForm.deliveryDate}
+                                                onChange={e => setNewOrderForm({ ...newOrderForm, deliveryDate: e.target.value })}
+                                                className="bg-white border border-stone-200 text-slate-800 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-3 shadow-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Payment & Status */}
+                                <div className="pt-2 space-y-4">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-orange-500 uppercase tracking-widest pb-2 border-b border-orange-100/50">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        Payment & Status
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6 pb-2">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Total Amount</label>
+                                            <div className="relative">
+                                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400 font-medium">
+                                                    ₹
+                                                </div>
+                                                <input
+                                                    type="number"
+                                                    required
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={newOrderForm.amount}
+                                                    onChange={e => setNewOrderForm({ ...newOrderForm, amount: e.target.value })}
+                                                    className="bg-white border border-stone-200 text-slate-800 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-3 pl-7 shadow-sm placeholder:text-slate-300"
+                                                    placeholder="0.00"
+                                                />
+                                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400 text-xs font-medium">
+                                                    {settingsForm.currency}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Advance Paid</label>
+                                            <div className="relative">
+                                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400 font-medium">
+                                                    ₹
+                                                </div>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={newOrderForm.advancePaid}
+                                                    onChange={e => setNewOrderForm({ ...newOrderForm, advancePaid: e.target.value })}
+                                                    className="bg-white border border-stone-200 text-slate-800 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-3 pl-7 shadow-sm placeholder:text-slate-300"
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Remaining Balance</label>
+                                            <div className="relative">
+                                                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400 font-medium">
+                                                    ₹
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    disabled
+                                                    value={remainingBalance.toFixed(2)}
+                                                    className="bg-orange-50 border border-orange-100 text-slate-800 text-sm rounded-lg block w-full p-3 pl-7 shadow-sm font-bold opacity-80 cursor-not-allowed"
+                                                />
+                                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-orange-400">
+                                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1.5">Initial Status</label>
+                                            <div className="relative">
+                                                <select
+                                                    value={newOrderForm.status}
+                                                    onChange={e => setNewOrderForm({ ...newOrderForm, status: e.target.value })}
+                                                    className="w-full appearance-none bg-white border border-stone-200 text-slate-800 text-sm rounded-lg focus:ring-orange-500 focus:border-orange-500 block w-full p-3 pr-8 shadow-sm"
+                                                >
+                                                    <option value="Received">Received</option>
+                                                    <option value="Processing">Processing</option>
+                                                    <option value="Cutting">Cutting</option>
+                                                    <option value="Fitting">Fitting</option>
+                                                    <option value="Ready">Ready</option>
+                                                </select>
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+                                                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </form>
+                        </div>
+
+                        {/* Footer Buttons */}
+                        <div className="px-8 py-5 bg-white border-t border-stone-100 flex justify-end items-center gap-3">
+                            <button
+                                onClick={() => setIsNewOrderModalOpen(false)}
+                                className="px-6 py-2.5 text-slate-500 font-bold text-sm bg-white border border-stone-200 rounded-lg hover:bg-stone-50 hover:text-slate-700 transition w-auto"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                form="new-order-form"
+                                className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-lg shadow-lg shadow-orange-500/20 flex items-center gap-2 transition transform active:scale-95"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                                Save Order
+                            </button>
                         </div>
                     </div>
                 </div>
