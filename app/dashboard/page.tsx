@@ -19,6 +19,7 @@ interface Order {
     quantity?: number;
     orderDate?: string;
     advancePaid?: number;
+    clothSource?: 'Customer' | 'Shop';
 }
 
 interface Customer {
@@ -151,7 +152,32 @@ export default function Dashboard() {
         amount: '',
         advancePaid: '',
         status: 'Received',
-        isUrgent: false
+        isUrgent: false,
+        clothSource: 'Customer', // Default to Customer
+        customerId: null as string | null // Track selected customer ID
+    });
+
+    const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+    const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+
+    // Filter customers based on search
+    const filteredCustomers = useMemo(() => {
+        if (!customerSearchQuery) return [];
+        return customers.filter(c => c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()));
+    }, [customers, customerSearchQuery]);
+
+    const selectCustomer = (customer: Customer) => {
+        setNewOrderForm(prev => ({ ...prev, customerName: customer.name, customerId: customer.id }));
+        setCustomerSearchQuery(customer.name);
+        setShowCustomerSuggestions(false);
+    };
+
+    // -- New Customer Form State --
+    const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
+    const [newCustomerForm, setNewCustomerForm] = useState({
+        name: '',
+        email: '',
+        phone: ''
     });
 
     // Derived Balance
@@ -196,7 +222,8 @@ export default function Dashboard() {
                 amount: parseFloat(newOrderForm.amount) || 0,
                 advance_paid: parseFloat(newOrderForm.advancePaid) || 0,
                 status: newOrderForm.status,
-                is_urgent: newOrderForm.isUrgent
+                is_urgent: newOrderForm.isUrgent,
+                cloth_source: newOrderForm.clothSource
             };
 
             const { data, error } = await supabase
@@ -208,6 +235,9 @@ export default function Dashboard() {
             if (error) throw error;
 
             if (data) {
+                // If we have a selected customer, update their stats (optional but good)
+                // For now, we just refresh the local state
+
                 const initials = data.customer_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2);
                 const newOrder: Order = {
                     id: data.id,
@@ -220,7 +250,8 @@ export default function Dashboard() {
                     isUrgent: data.is_urgent,
                     quantity: data.quantity,
                     orderDate: data.order_date,
-                    advancePaid: data.advance_paid
+                    advancePaid: data.advance_paid,
+                    clothSource: data.cloth_source
                 };
                 setOrders([newOrder, ...orders]);
                 setIsNewOrderModalOpen(false);
@@ -233,12 +264,50 @@ export default function Dashboard() {
                     amount: '',
                     advancePaid: '',
                     status: 'Received',
-                    isUrgent: false
+                    isUrgent: false,
+                    clothSource: 'Customer',
+                    customerId: null
                 });
+                setCustomerSearchQuery('');
             }
         } catch (error) {
             console.error('Error creating order:', error);
             alert('Failed to create order. Please try again.');
+        }
+    };
+
+    const handleCreateCustomer = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const { data, error } = await supabase
+                .from('customers')
+                .insert([{
+                    name: newCustomerForm.name,
+                    email: newCustomerForm.email,
+                    phone: newCustomerForm.phone
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                const newCustomer: Customer = {
+                    id: data.id,
+                    name: data.name,
+                    email: data.email || '',
+                    phone: data.phone || '',
+                    ordersCount: 0,
+                    totalSpent: 0,
+                    lastOrderDate: ''
+                };
+                setCustomers([newCustomer, ...customers]);
+                setIsNewCustomerModalOpen(false);
+                setNewCustomerForm({ name: '', email: '', phone: '' });
+            }
+        } catch (error) {
+            console.error('Error creating customer:', error);
+            alert('Failed to create customer.');
         }
     };
 
@@ -514,8 +583,19 @@ export default function Dashboard() {
                         {/* View: Customers (Plug) */}
                         {activeTab === 'customers' && (
                             <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-8 text-center text-gray-400">
-                                <p className="text-lg font-bold">Customer Directory</p>
-                                <p className="text-sm">Manage contacts, measurements, and history.</p>
+                                <div className="flex justify-between items-center mb-6">
+                                    <div>
+                                        <p className="text-lg font-bold text-gray-900">Customer Directory</p>
+                                        <p className="text-sm">Manage contacts, measurements, and history.</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsNewCustomerModalOpen(true)}
+                                        className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center transition-colors"
+                                    >
+                                        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                        Add Customer
+                                    </button>
+                                </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 text-left">
                                     {customers.map(c => (
@@ -639,6 +719,77 @@ export default function Dashboard() {
                 )}
             </main>
 
+            {/* New Customer Modal */}
+            {isNewCustomerModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-[#fffdf9] rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-white/50 relative animate-in zoom-in-95 duration-200">
+                        <div className="px-8 py-6 border-b border-orange-100/50 bg-white/50">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-800">Add Customer</h2>
+                                    <p className="text-slate-500 text-sm mt-1">Add a new client to your directory.</p>
+                                </div>
+                                <button onClick={() => setIsNewCustomerModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-8">
+                            <form onSubmit={handleCreateCustomer} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={newCustomerForm.name}
+                                        onChange={e => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })}
+                                        className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800"
+                                        placeholder="e.g. Jane Doe"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone Number</label>
+                                    <input
+                                        type="tel"
+                                        value={newCustomerForm.phone}
+                                        onChange={e => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })}
+                                        className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800"
+                                        placeholder="e.g. (555) 000-0000"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
+                                    <input
+                                        type="email"
+                                        value={newCustomerForm.email}
+                                        onChange={e => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
+                                        className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800"
+                                        placeholder="e.g. jane@example.com"
+                                    />
+                                </div>
+
+                                <div className="pt-4 flex gap-3 justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsNewCustomerModalOpen(false)}
+                                        className="px-5 py-2.5 text-slate-500 font-bold text-sm bg-white border border-stone-200 rounded-lg hover:bg-stone-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-lg shadow-lg shadow-orange-500/20"
+                                    >
+                                        Save Customer
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* New Order Modal */}
             {isNewOrderModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
@@ -665,15 +816,37 @@ export default function Dashboard() {
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                                         Customer Information
                                     </div>
-                                    <div className="bg-white rounded-xl border border-stone-200 p-1.5 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-orange-100">
+                                    <div className="bg-white rounded-xl border border-stone-200 p-1.5 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-orange-100 relative">
                                         <input
                                             type="text"
                                             required
-                                            value={newOrderForm.customerName}
-                                            onChange={e => setNewOrderForm({ ...newOrderForm, customerName: e.target.value })}
+                                            value={customerSearchQuery}
+                                            onChange={e => {
+                                                setCustomerSearchQuery(e.target.value);
+                                                setNewOrderForm({ ...newOrderForm, customerName: e.target.value, customerId: null });
+                                                setShowCustomerSuggestions(true);
+                                            }}
+                                            onFocus={() => setShowCustomerSuggestions(true)}
+                                            onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 200)}
                                             className="w-full px-4 py-3 bg-transparent outline-none text-slate-800 font-medium placeholder:text-slate-400"
-                                            placeholder="Enter customer name..."
+                                            placeholder="Search existing customer or type new name..."
+                                            autoComplete="off"
                                         />
+                                        {/* Autocomplete Dropdown */}
+                                        {showCustomerSuggestions && filteredCustomers.length > 0 && (
+                                            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
+                                                {filteredCustomers.map(c => (
+                                                    <div
+                                                        key={c.id}
+                                                        onClick={() => selectCustomer(c)}
+                                                        className="px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm text-slate-700 font-medium flex justify-between group"
+                                                    >
+                                                        <span>{c.name}</span>
+                                                        <span className="text-slate-400 text-xs group-hover:text-orange-500">{c.phone}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -719,6 +892,30 @@ export default function Dashboard() {
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* Cloth Source */}
+                                <div className="pt-2 space-y-4">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-orange-500 uppercase tracking-widest pb-2 border-b border-orange-100/50">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                        Cloth Source
+                                    </div>
+                                    <div className="flex bg-stone-100 p-1 rounded-lg">
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewOrderForm({ ...newOrderForm, clothSource: 'Customer' })}
+                                            className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${newOrderForm.clothSource === 'Customer' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Customer's Cloth
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewOrderForm({ ...newOrderForm, clothSource: 'Shop' })}
+                                            className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${newOrderForm.clothSource === 'Shop' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        >
+                                            Shop's Cloth
+                                        </button>
                                     </div>
                                 </div>
 
