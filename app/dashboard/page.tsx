@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 // --- Types ---
 type OrderStatus = 'Processing' | 'Ready' | 'Cutting' | 'Fitting' | 'Completed';
@@ -101,12 +102,32 @@ export default function Dashboard() {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                // TODO: Replace with Supabase fetch
-                // const { data: ordersData, error: ordersError } = await supabase.from('orders').select('*');
-                // const { data: customersData, error: customersError } = await supabase.from('customers').select('*');
+                const { data: ordersData, error: ordersError } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .order('created_at', { ascending: false });
 
-                // setOrders(ordersData || []);
-                // setCustomers(customersData || []);
+                if (ordersError) throw ordersError;
+
+                const formattedOrders: Order[] = (ordersData || []).map(order => ({
+                    id: order.id,
+                    customerName: order.customer_name,
+                    initial: order.customer_name ? order.customer_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) : 'XX',
+                    clothType: order.cloth_type,
+                    deliveryDate: order.delivery_date,
+                    amount: Number(order.amount),
+                    status: order.status as OrderStatus,
+                    isUrgent: order.is_urgent
+                }));
+
+                const { data: customersData, error: customersError } = await supabase.from('customers').select('*');
+
+                if (customersError) {
+                    console.error('Error fetching customers:', customersError);
+                }
+
+                setOrders(formattedOrders);
+                setCustomers(customersData || []);
             } catch (error) {
                 console.error('Error fetching data:', error);
             } finally {
@@ -130,12 +151,18 @@ export default function Dashboard() {
     const [settingsForm, setSettingsForm] = useState({
         shopName: 'Indigo Denim & Copper',
         masterTailor: 'John Doe',
-        email: 'j.doe@indigo.com',
         phone: '(555) 012-3456',
-        address: '123 Selvedge Street, Denim District, NY 10012',
         currency: 'USD',
         notifications: true
     });
+
+    const currencySymbols: Record<string, string> = {
+        'USD': '$',
+        'EUR': '€',
+        'GBP': '£',
+        'INR': '₹'
+    };
+    const currencySymbol = currencySymbols[settingsForm.currency] || '$';
 
     const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -149,23 +176,47 @@ export default function Dashboard() {
 
     // -- Handlers --
 
-    const handleCreateOrder = (e: React.FormEvent) => {
+    const handleCreateOrder = async (e: React.FormEvent) => {
         e.preventDefault();
-        const initials = newOrderForm.customerName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-        const newOrder: Order = {
-            id: Math.random().toString(36).substr(2, 9),
-            customerName: newOrderForm.customerName,
-            initial: initials || 'XX',
-            clothType: newOrderForm.clothType,
-            deliveryDate: newOrderForm.deliveryDate,
-            amount: parseFloat(newOrderForm.amount) || 0,
-            status: newOrderForm.status as OrderStatus,
-            isUrgent: newOrderForm.isUrgent
-        };
 
-        setOrders([newOrder, ...orders]);
-        setIsNewOrderModalOpen(false);
-        setNewOrderForm({ customerName: '', clothType: '', deliveryDate: '', amount: '', isUrgent: false, status: 'Processing' });
+        try {
+            const newOrderPayload = {
+                customer_name: newOrderForm.customerName,
+                cloth_type: newOrderForm.clothType,
+                delivery_date: newOrderForm.deliveryDate,
+                amount: parseFloat(newOrderForm.amount) || 0,
+                status: newOrderForm.status,
+                is_urgent: newOrderForm.isUrgent
+            };
+
+            const { data, error } = await supabase
+                .from('orders')
+                .insert([newOrderPayload])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                const initials = data.customer_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2);
+                const newOrder: Order = {
+                    id: data.id,
+                    customerName: data.customer_name,
+                    initial: initials || 'XX',
+                    clothType: data.cloth_type,
+                    deliveryDate: data.delivery_date,
+                    amount: data.amount,
+                    status: data.status as OrderStatus,
+                    isUrgent: data.is_urgent
+                };
+                setOrders([newOrder, ...orders]);
+                setIsNewOrderModalOpen(false);
+                setNewOrderForm({ customerName: '', clothType: '', deliveryDate: '', amount: '', isUrgent: false, status: 'Processing' });
+            }
+        } catch (error) {
+            console.error('Error creating order:', error);
+            alert('Failed to create order. Please try again.');
+        }
     };
 
     const handleSaveSettings = async (e: React.FormEvent) => {
@@ -178,14 +229,34 @@ export default function Dashboard() {
         alert("Settings saved successfully!");
     };
 
-    const deleteOrder = (id: string) => {
-        setOrders(orders.filter(o => o.id !== id));
-        setOpenMenuId(null);
+    const deleteOrder = async (id: string) => {
+        try {
+            const { error } = await supabase.from('orders').delete().eq('id', id);
+            if (error) throw error;
+
+            setOrders(orders.filter(o => o.id !== id));
+            setOpenMenuId(null);
+        } catch (error) {
+            console.error('Error deleting order:', error);
+            alert('Failed to delete order.');
+        }
     };
 
-    const updateStatus = (id: string, newStatus: OrderStatus) => {
-        setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus } : o));
-        setOpenMenuId(null);
+    const updateStatus = async (id: string, newStatus: OrderStatus) => {
+        try {
+            const { error } = await supabase
+                .from('orders')
+                .update({ status: newStatus })
+                .eq('id', id);
+
+            if (error) throw error;
+
+            setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus } : o));
+            setOpenMenuId(null);
+        } catch (error) {
+            console.error('Error updating status:', error);
+            alert('Failed to update status.');
+        }
     };
 
     // Close menus when clicking outside
@@ -252,7 +323,7 @@ export default function Dashboard() {
                                     </td>
                                     <td className="px-6 py-4 text-gray-600 font-medium">{order.clothType}</td>
                                     <td className="px-6 py-4 text-gray-500">{order.deliveryDate}</td>
-                                    <td className="px-6 py-4 font-bold text-gray-900">${order.amount.toFixed(2)}</td>
+                                    <td className="px-6 py-4 font-bold text-gray-900">{currencySymbol}{order.amount.toFixed(2)}</td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusColor(order.status)}`}>
                                             {order.status}
@@ -392,7 +463,7 @@ export default function Dashboard() {
                                         { label: 'Total Customers', val: totalCustomers.toLocaleString(), sub: '+12%', subText: 'from last month', subColor: 'text-emerald-500', iconType: 'users' },
                                         { label: 'Active Orders', val: activeOrdersCount.toString(), sub: `! ${urgentOrdersCount} Urgent`, subText: 'orders pending', subColor: 'text-orange-500 font-bold', iconType: 'orders' },
                                         { label: "Today's Deliveries", val: completedToday.toString(), sub: '🕒 3 Completed', subText: '', subColor: 'text-slate-500', iconType: 'delivery' },
-                                        { label: 'Total Revenue', val: `$${totalRevenue.toLocaleString()}`, sub: `⚠ ${overdueCount} Overdue`, subText: 'payments', subColor: 'text-red-500 font-bold', iconType: 'money' },
+                                        { label: 'Total Revenue', val: `${currencySymbol}${totalRevenue.toLocaleString()}`, sub: `⚠ ${overdueCount} Overdue`, subText: 'payments', subColor: 'text-red-500 font-bold', iconType: 'money' },
                                     ].map((stat, idx) => (
                                         <div key={idx} className="bg-white rounded-xl p-6 shadow-sm border border-stone-100 flex justify-between items-start relative overflow-hidden group hover:shadow-md transition-shadow">
                                             <div className="absolute left-0 top-3 bottom-3 w-[4px] border-l-2 border-dashed border-red-400"></div>
@@ -430,7 +501,7 @@ export default function Dashboard() {
                                             <p className="text-xs text-gray-500">{c.email} • {c.phone}</p>
                                             <div className="mt-2 text-xs flex justify-between">
                                                 <span>{c.ordersCount} Orders</span>
-                                                <span className="text-orange-600 font-bold">${c.totalSpent} Spent</span>
+                                                <span className="text-orange-600 font-bold">{currencySymbol}{c.totalSpent} Spent</span>
                                             </div>
                                         </div>
                                     ))}
@@ -466,18 +537,9 @@ export default function Dashboard() {
                                                     <input type="text" value={settingsForm.masterTailor} onChange={e => setSettingsForm({ ...settingsForm, masterTailor: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-medium transition-all" />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Email Address</label>
-                                                    <input type="email" value={settingsForm.email} onChange={e => setSettingsForm({ ...settingsForm, email: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-medium transition-all" />
-                                                </div>
-                                                <div>
                                                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Phone Number</label>
                                                     <input type="tel" value={settingsForm.phone} onChange={e => setSettingsForm({ ...settingsForm, phone: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-medium transition-all" />
                                                 </div>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Shop Address</label>
-                                                <textarea rows={3} value={settingsForm.address} onChange={e => setSettingsForm({ ...settingsForm, address: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-medium transition-all resize-none"></textarea>
                                             </div>
                                         </div>
                                     </div>
@@ -600,7 +662,7 @@ export default function Dashboard() {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Amount ($)</label>
+                                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Amount ({currencySymbol})</label>
                                         <input type="number" required min="0" step="0.01" value={newOrderForm.amount} onChange={e => setNewOrderForm({ ...newOrderForm, amount: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900" placeholder="0.00" />
                                     </div>
                                     <div className="flex items-end pb-3">
