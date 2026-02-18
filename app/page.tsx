@@ -71,10 +71,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative overflow-hidden bg-[#131b2e]">
-      {/* Denim Texture Background Layer */}
-      <div className="absolute inset-0 z-0 bg-denim opacity-90 pointer-events-none"></div>
-
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative overflow-hidden bg-denim">
       {/* Main Login Card */}
       <div className="relative z-10 w-full max-w-[420px] bg-[#fdfbf7] rounded-xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col min-h-[550px]">
 
@@ -89,17 +86,17 @@ export default function Home() {
 
           {/* Logo & Header */}
           <div className="mb-2 flex flex-col items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mb-6 shadow-sm border border-amber-100">
-              <ScissorsIcon />
+            <div className="w-24 h-24 rounded-full bg-[#131b2e] flex items-center justify-center mb-6 shadow-lg border border-amber-100/20 overflow-hidden">
+              <img src="/Logo.png" alt="Dadashri Designers" className="w-full h-full object-contain scale-105" />
             </div>
 
-            <h1 className="text-center font-black text-2xl leading-none text-gray-900 tracking-tight uppercase mb-2">
-              INDIGO DENIM &<br />COPPER
+            <h1 className="text-center leading-tight mb-2">
+              <span className="font-bold text-4xl block text-[#131c3f] font-medium">Dadashri Designers</span>
             </h1>
-            <p className="text-gray-500 text-[11px] font-bold tracking-widest uppercase mb-4 opacity-80">
-              TAILOR SHOP MANAGEMENT
+            <p className="text-orange-500 text-[10px] font-bold tracking-[0.2em] uppercase mb-4 opacity-90">
+              COUTURE • FASHION • QUALITY
             </p>
-            <div className="w-12 h-1 bg-amber-200/50 rounded-full mb-8"></div>
+            <div className="w-16 h-[1px] bg-orange-400/30 mb-8"></div>
           </div>
 
           {/* Login Form */}
@@ -107,7 +104,7 @@ export default function Home() {
 
             <div className="space-y-1">
               <label htmlFor="email" className="text-[10px] font-bold text-gray-500 tracking-wider uppercase block ml-0.5">
-                Username / Email
+                USERNAME / EMAIL
               </label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -161,18 +158,12 @@ export default function Home() {
                 ) : (
                   <span className="w-4 h-4 flex items-center"><ArrowRightIcon /></span>
                 )}
-                {loading ? 'AUTHENTICATING...' : 'LOGIN TO WORKSHOP'}
+                {loading ? 'AUTHENTICATING...' : 'ENTER WORKSHOP'}
               </button>
             </div>
 
           </form>
 
-          {/* Footer inside card */}
-          <div className="mt-auto pt-8 pb-2 text-center">
-            <p className="text-xs text-gray-400 font-medium">
-              New craftsman? <a href="#" className="text-gray-800 font-bold hover:underline transition-colors">Apply for access</a>
-            </p>
-          </div>
 
         </div>
       </div>
@@ -181,7 +172,7 @@ export default function Home() {
       <div className="mt-8 relative z-10 flex items-center justify-center opacity-40 hover:opacity-100 transition-opacity duration-300">
         <VerifiedIcon />
         <p className="text-[11px] font-medium text-slate-300 tracking-wide uppercase font-mono">
-          Est. 2024 • Crafted for durability
+          EST. 2026 • CRAFTED FOR ELEGANCE
         </p>
       </div>
 

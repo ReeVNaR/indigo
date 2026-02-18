@@ -188,8 +188,8 @@ export default function Dashboard() {
     }, [newOrderForm.amount, newOrderForm.advancePaid]);
 
     const [settingsForm, setSettingsForm] = useState({
-        shopName: 'Indigo Denim & Copper',
-        masterTailor: 'John Doe',
+        shopName: 'Dadashri Designers',
+        masterTailor: 'Dadashri',
         phone: '(555) 012-3456',
         currency: 'INR',
         notifications: true
@@ -468,13 +468,13 @@ export default function Dashboard() {
                 </div>
 
                 {/* Logo */}
-                <div className="h-24 flex items-center px-6 border-b border-white/5 relative">
-                    <div className="w-10 h-10 rounded-lg bg-[#2a303c] flex items-center justify-center mr-3 border border-gray-600 shadow-inner">
-                        <span className="text-orange-500"><SidebarIcon name="scissors" /></span>
+                <div className="h-28 flex items-center px-3 border-b border-white/5 relative">
+                    <div className="w-16 h-16 rounded-full bg-[#131b2e] flex items-center justify-center mr-4 border border-amber-100/20 shadow-xl overflow-hidden shrink-0">
+                        <img src="/Logo.png" alt="Dadashri" className="w-full h-full object-contain scale-125" />
                     </div>
                     <div className="flex flex-col">
-                        <span className="text-white font-bold text-lg leading-tight tracking-tight">Indigo Denim</span>
-                        <span className="text-gray-400 text-[10px] uppercase tracking-widest">Management</span>
+                        <span className="text-gray-200 font-playfair font-bold text-3xl leading-none tracking-tight">Dadashri</span>
+                        <span className="text-orange-400 text-xs font-bold uppercase tracking-[0.15em] mt-1">Designers</span>
                     </div>
                 </div>
 
@@ -502,10 +502,10 @@ export default function Dashboard() {
                 <div className="p-4 mb-2">
                     <div className="flex items-center p-3 rounded-xl bg-[#00000033] border border-white/5 backdrop-blur-sm">
                         <div className="w-10 h-10 rounded-full bg-orange-200 flex items-center justify-center text-orange-800 font-bold border-2 border-orange-400/30">
-                            JD
+                            D
                         </div>
                         <div className="ml-3 flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">John Doe</p>
+                            <p className="text-sm font-medium text-white truncate">Dadashri</p>
                             <p className="text-xs text-gray-400 truncate">Master Tailor</p>
                         </div>
                         <button onClick={() => router.push('/')} className="text-gray-400 hover:text-white hover:bg-white/10 p-1 rounded transition-colors" title="Logout">
@@ -534,7 +534,7 @@ export default function Dashboard() {
                                     {activeTab === 'dashboard' ? 'Workshop Overview' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                                 </h1>
                                 <p className="text-gray-500 mt-1 font-medium">
-                                    {activeTab === 'dashboard' ? 'Welcome back, Master Tailor.' : `Manage your ${activeTab}.`}
+                                    {activeTab === 'dashboard' ? 'Welcome back, Dadashri.' : `Manage your ${activeTab}.`}
                                 </p>
                             </div>
                             <button
