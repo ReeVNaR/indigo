@@ -22,11 +22,6 @@ import {
     Plus
 } from "lucide-react";
 
-export const GARMENT_OPTIONS = [
-    'Shirt', 'Pant', 'Kurta', 'Blazer', 'Suit', 'Safari', 'Waistcoat', 'Jacket', 'Sherwani'
-] as const;
-export type GarmentType = typeof GARMENT_OPTIONS[number];
-
 interface NewOrderFormProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
@@ -48,7 +43,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
         },
         showInlineCustomerForm: false, // For creating new customer
         items: [] as {
-            garment_type: GarmentType,
+            garment_type: 'Shirt' | 'Pant' | 'Kurta',
             quantity: number,
             price: number,
             fabric_source: 'Customer' | 'Shop'
@@ -130,7 +125,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
         setShowCustomerSuggestions(false);
     };
 
-    const toggleGarment = (type: GarmentType) => {
+    const toggleGarment = (type: 'Shirt' | 'Pant' | 'Kurta') => {
         const idx = newOrderForm.items.findIndex(i => i.garment_type === type);
         if (idx !== -1) {
             // Remove
@@ -144,7 +139,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
         }
     };
 
-    const updateItem = (type: GarmentType, field: 'quantity' | 'price', value: number) => {
+    const updateItem = (type: 'Shirt' | 'Pant' | 'Kurta', field: 'quantity' | 'price', value: number) => {
         setNewOrderForm(p => ({
             ...p,
             items: p.items.map(i => i.garment_type === type ? { ...i, [field]: value } : i)
@@ -385,8 +380,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                             type="button"
                             onClick={() => handleGlobalClothSourceChange('Customer')}
                             className={`px-3 py-0.5 rounded-full transition-colors ${newOrderForm.clothSource === 'Customer'
-                                    ? 'bg-amber-500 text-white shadow-sm'
-                                    : 'text-slate-500'
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'text-slate-500'
                                 }`}
                         >
                             Customer
@@ -395,8 +390,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                             type="button"
                             onClick={() => handleGlobalClothSourceChange('Shop')}
                             className={`px-3 py-0.5 rounded-full transition-colors ${newOrderForm.clothSource === 'Shop'
-                                    ? 'bg-amber-500 text-white shadow-sm'
-                                    : 'text-slate-500'
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'text-slate-500'
                                 }`}
                         >
                             Shop
@@ -405,8 +400,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {GARMENT_OPTIONS.map(type => {
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {(['Shirt', 'Pant', 'Kurta'] as const).map(type => {
                     const item = newOrderForm.items.find(i => i.garment_type === type);
                     const isSelected = !!item;
 
@@ -473,8 +468,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                     }));
                                                 }}
                                                 className={`px-3 py-0.5 rounded-full transition-colors ${item.fabric_source === 'Customer'
-                                                        ? 'bg-amber-500 text-white shadow-sm'
-                                                        : 'text-slate-500'
+                                                    ? 'bg-amber-500 text-white shadow-sm'
+                                                    : 'text-slate-500'
                                                     }`}
                                             >
                                                 Customer
@@ -491,8 +486,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                     }));
                                                 }}
                                                 className={`px-3 py-0.5 rounded-full transition-colors ${item.fabric_source === 'Shop'
-                                                        ? 'bg-amber-500 text-white shadow-sm'
-                                                        : 'text-slate-500'
+                                                    ? 'bg-amber-500 text-white shadow-sm'
+                                                    : 'text-slate-500'
                                                     }`}
                                             >
                                                 Shop
