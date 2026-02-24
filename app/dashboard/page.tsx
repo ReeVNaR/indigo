@@ -210,8 +210,8 @@ export default function Dashboard() {
 
                 setOrders(formattedOrders);
                 setCustomers(customersData || []);
-            } catch (error) {
-                console.error('Error fetching data:', error);
+            } catch (error: any) {
+                console.error('Error fetching data:', error?.message || error);
             } finally {
                 setIsLoading(false);
             }
