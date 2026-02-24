@@ -12,16 +12,12 @@ import {
     Settings,
     Scissors,
     LogOut,
-    TrendingUp,
     Package,
     Truck,
     IndianRupee,
     Plus,
     MoreVertical,
     Trash2,
-    CheckCircle2,
-    Clock,
-    AlertCircle,
     Loader2,
     Search
 } from "lucide-react";
@@ -45,11 +41,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
-    DialogFooter,
 } from "@/components/ui/dialog";
 import {
     Table,
@@ -59,42 +52,10 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import NewCustomerForm from '@/components/dashboard/NewCustomerForm';
+import NewOrderForm from '@/components/dashboard/NewOrderForm';
+import { Order, Customer, OrderStatus } from '@/lib/types';
 
-
-// --- Types ---
-type OrderStatus = 'Received' | 'Processing' | 'Ready' | 'Cutting' | 'Fitting' | 'Completed';
-
-interface Order {
-    id: string;
-    customerName: string;
-    initial: string;
-    clothType: string;
-    deliveryDate: string;
-    amount: number;
-    status: OrderStatus;
-    isUrgent?: boolean;
-    quantity?: number;
-    orderDate?: string;
-    advancePaid?: number;
-    clothSource?: 'Customer' | 'Shop';
-}
-
-interface Customer {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    ordersCount: number;
-    totalSpent: number;
-    lastOrderDate: string;
-    measurements?: {
-        shirt?: { length: string; chest: string; waist: string; shoulder: string; sleeve: string; neck: string; cuff: string; lastUpdated?: string };
-        pant?: { length: string; waist: string; hip: string; thigh: string; knee: string; bottom: string; lastUpdated?: string };
-        kurta?: { length: string; chest: string; waist: string; hip: string; shoulder: string; sleeve: string; neck: string; lastUpdated?: string };
-    };
-}
-
-// --- Icons ---
 // --- Icons & Helpers ---
 const SidebarIcon = ({ name, active }: { name: string; active?: boolean }) => {
     const className = `w-5 h-5 ${active ? "text-orange-500" : "text-gray-400 group-hover:text-gray-200"}`;
@@ -126,18 +87,6 @@ const ArrowRightIcon = () => (
         <polyline points="12 5 19 12 12 19" />
     </svg>
 );
-
-const TrashIcon = () => (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="3 6 5 6 21 6" />
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    </svg>
-);
-
-// --- Default Data ---
-// --- Default Data ---
-const initialOrders: Order[] = [];
-const initialCustomers: Customer[] = [];
 
 // --- Sidebar Content ---
 const SidebarContent = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, setActiveTab: (id: string) => void, onLogout: () => void }) => {
@@ -207,12 +156,23 @@ export default function Dashboard() {
     const [activeProfileTab, setActiveProfileTab] = useState<'measures' | 'history'>('measures');
     const [editingMeasurementGarment, setEditingMeasurementGarment] = useState<'shirt' | 'pant' | 'kurta' | null>(null);
     const [measurementForm, setMeasurementForm] = useState<any>({});
-    const [orders, setOrders] = useState<Order[]>(initialOrders);
-    const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [customers, setCustomers] = useState<Customer[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
+    const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+
+    const [settingsForm, setSettingsForm] = useState({
+        shopName: 'Dadashri Designers',
+        masterTailor: 'Dadashri',
+        phone: '(555) 012-3456',
+        currency: 'INR',
+        notifications: true
+    });
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const currencySymbol = '₹';
 
     // -- Data Fetching --
     useEffect(() => {
@@ -234,7 +194,12 @@ export default function Dashboard() {
                     deliveryDate: order.delivery_date,
                     amount: Number(order.amount),
                     status: order.status as OrderStatus,
-                    isUrgent: order.is_urgent
+                    isUrgent: order.is_urgent,
+                    // Map other fields as needed for the Order interface
+                    quantity: order.quantity,
+                    orderDate: order.order_date,
+                    advancePaid: order.advance_paid,
+                    clothSource: order.cloth_source
                 }));
 
                 const { data: customersData, error: customersError } = await supabase.from('customers').select('*');
@@ -254,56 +219,6 @@ export default function Dashboard() {
 
         fetchData();
     }, []);
-
-    // -- New Order Form State --
-    const [newOrderForm, setNewOrderForm] = useState({
-        customerId: null as string | null,
-        customerData: {
-            name: '',
-            phone: '',
-            category: 'Adult' as 'Adult' | 'Kid'
-        },
-        showInlineCustomerForm: false,
-        items: [] as {
-            garment_type: 'Shirt' | 'Pant' | 'Kurta',
-            quantity: number,
-            price: number,
-            fabric_source: 'Customer' | 'Shop'
-        }[],
-        deliveryDate: new Date().toISOString().split('T')[0],
-        advancePaid: 0,
-        status: 'Received' as OrderStatus,
-        isUrgent: false
-    });
-
-    const [customerSearchQuery, setCustomerSearchQuery] = useState('');
-    const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
-
-    // Derived State for Order
-    const totalAmount = useMemo(() => {
-        return newOrderForm.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-    }, [newOrderForm.items]);
-
-    const itemsRemainingBalance = useMemo(() => {
-        return Math.max(0, totalAmount - newOrderForm.advancePaid);
-    }, [totalAmount, newOrderForm.advancePaid]);
-
-    // Filter customers based on search
-    const filteredCustomers = useMemo(() => {
-        if (!customerSearchQuery) return [];
-        return customers.filter(c => c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()));
-    }, [customers, customerSearchQuery]);
-
-    const selectCustomer = (customer: Customer) => {
-        setNewOrderForm(prev => ({
-            ...prev,
-            customerId: customer.id,
-            customerData: { name: customer.name, phone: customer.phone, category: 'Adult' },
-            showInlineCustomerForm: false
-        }));
-        setCustomerSearchQuery(customer.name);
-        setShowCustomerSuggestions(false);
-    };
 
     // -- Global Search Filtering --
     const filteredOrders = useMemo(() => {
@@ -326,29 +241,6 @@ export default function Dashboard() {
         );
     }, [customers, globalSearchQuery]);
 
-    // -- New Customer Form State --
-    const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
-    const [newCustomerForm, setNewCustomerForm] = useState({
-        name: '',
-        email: '',
-        phone: ''
-    });
-
-    // Derived Balance and Total (Moved up to render helpers or defined here)
-    // totalAmount and itemsRemainingBalance are already defined above using useMemo
-
-    const [settingsForm, setSettingsForm] = useState({
-        shopName: 'Dadashri Designers',
-        masterTailor: 'Dadashri',
-        phone: '(555) 012-3456',
-        currency: 'INR',
-        notifications: true
-    });
-
-    const currencySymbol = '₹';
-
-    const [isSavingSettings, setIsSavingSettings] = useState(false);
-
     // -- Derived Stats --
     const totalCustomers = useMemo(() => customers.length, [customers]);
     const activeOrdersCount = useMemo(() => orders.filter(o => o.status !== 'Completed').length, [orders]);
@@ -358,177 +250,6 @@ export default function Dashboard() {
     const overdueCount = useMemo(() => orders.filter(o => new Date(o.deliveryDate) < new Date() && o.status !== 'Completed').length, [orders]);
 
     // -- Handlers --
-
-    const handleSaveOrder = async () => {
-        try {
-            let finalCustomerId = newOrderForm.customerId;
-
-            // 1. Create customer if not exists
-            if (!finalCustomerId) {
-                const { data: customer, error: custError } = await supabase
-                    .from('customers')
-                    .insert([{
-                        name: newOrderForm.customerData.name,
-                        phone: newOrderForm.customerData.phone,
-                        email: `${newOrderForm.customerData.name.toLowerCase().replace(/\s+/g, '.')}@example.com` // Fallback
-                    }])
-                    .select()
-                    .single();
-
-                if (custError) throw custError;
-                finalCustomerId = customer.id;
-                // Refresh customers list
-                setCustomers([customer, ...customers]);
-            }
-
-            // 2. Create the Order
-            // Note: Since we are allowing multiple items, we might need a separate table 'order_items'.
-            // If it doesn't exist, we can store a stringified list or just the first item for now to avoid breaking existing DB.
-            // USER specifically said "create order_items", so I'll assume it exists or I should structure for it.
-
-            const newOrderPayload = {
-                customer_id: finalCustomerId,
-                customer_name: newOrderForm.customerData.name,
-                delivery_date: newOrderForm.deliveryDate,
-                order_date: new Date().toISOString().split('T')[0],
-                amount: totalAmount,
-                advance_paid: newOrderForm.advancePaid,
-                status: newOrderForm.status,
-                is_urgent: newOrderForm.isUrgent,
-                // These are legacy fields if the table hasn't migrated yet
-                cloth_type: newOrderForm.items.map(i => i.garment_type).join(', '),
-                quantity: newOrderForm.items.reduce((s, i) => s + i.quantity, 0),
-                cloth_source: newOrderForm.items[0]?.fabric_source || 'Customer'
-            };
-
-            const { data: orderData, error: orderError } = await supabase
-                .from('orders')
-                .insert([newOrderPayload])
-                .select()
-                .single();
-
-            if (orderError) throw orderError;
-
-            // 3. Create Order Items if items array has data
-            if (newOrderForm.items.length > 0) {
-                const itemsPayload = newOrderForm.items.map(item => ({
-                    order_id: orderData.id,
-                    garment_type: item.garment_type,
-                    quantity: item.quantity,
-                    price: item.price,
-                    fabric_source: item.fabric_source
-                }));
-
-                const { error: itemsError } = await supabase
-                    .from('order_items')
-                    .insert(itemsPayload);
-
-                // If order_items doesn't exist yet, we ignore error but log it 
-                // in a real app we'd handle this better, but here we prioritize user's request for atomic saves.
-                if (itemsError) console.warn('Order items table might not exist:', itemsError.message);
-            }
-
-            // 4. Update UI
-            const initials = orderData.customer_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2);
-            const newOrder: Order = {
-                id: orderData.id,
-                customerName: orderData.customer_name,
-                initial: initials || 'XX',
-                clothType: orderData.cloth_type,
-                deliveryDate: orderData.delivery_date,
-                amount: orderData.amount,
-                status: orderData.status as OrderStatus,
-                isUrgent: orderData.is_urgent,
-                quantity: orderData.quantity,
-                orderDate: orderData.order_date,
-                advancePaid: orderData.advance_paid,
-                clothSource: orderData.cloth_source
-            };
-
-            setOrders([newOrder, ...orders]);
-            setIsNewOrderModalOpen(false);
-
-            // RESET FORM
-            setNewOrderForm({
-                customerId: null,
-                customerData: { name: '', phone: '', category: 'Adult' },
-                showInlineCustomerForm: false,
-                items: [],
-                deliveryDate: new Date().toISOString().split('T')[0],
-                advancePaid: 0,
-                status: 'Received',
-                isUrgent: false
-            });
-            setCustomerSearchQuery('');
-
-        } catch (error) {
-            console.error('Error saving order atomic flow:', error);
-            alert('Failed to save order. Check console for details.');
-        }
-    };
-
-    const handleSaveMeasurements = async () => {
-        if (!selectedCustomerId || !editingMeasurementGarment) return;
-        try {
-            const customer = customers.find(c => c.id === selectedCustomerId);
-            if (!customer) return;
-            const updatedMeasurements = {
-                ...(customer.measurements || {}),
-                [editingMeasurementGarment]: {
-                    ...measurementForm,
-                    lastUpdated: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                }
-            };
-            const { error } = await supabase
-                .from('customers')
-                .update({ measurements: updatedMeasurements })
-                .eq('id', selectedCustomerId);
-            if (error) console.warn('Could not save measurements (column may not exist yet):', error.message);
-            setCustomers(prev => prev.map(c =>
-                c.id === selectedCustomerId ? { ...c, measurements: updatedMeasurements } : c
-            ));
-            setEditingMeasurementGarment(null);
-            setMeasurementForm({});
-        } catch (error) {
-            console.error('Error saving measurements:', error);
-        }
-    };
-
-    const handleCreateCustomer = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            const { data, error } = await supabase
-                .from('customers')
-                .insert([{
-                    name: newCustomerForm.name,
-                    email: newCustomerForm.email,
-                    phone: newCustomerForm.phone
-                }])
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            if (data) {
-                const newCustomer: Customer = {
-                    id: data.id,
-                    name: data.name,
-                    email: data.email || '',
-                    phone: data.phone || '',
-                    ordersCount: 0,
-                    totalSpent: 0,
-                    lastOrderDate: ''
-                };
-                setCustomers([newCustomer, ...customers]);
-                setIsNewCustomerModalOpen(false);
-                setNewCustomerForm({ name: '', email: '', phone: '' });
-            }
-        } catch (error) {
-            console.error('Error creating customer:', error);
-            alert('Failed to create customer.');
-        }
-    };
-
     const handleSaveSettings = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSavingSettings(true);
@@ -567,6 +288,44 @@ export default function Dashboard() {
             console.error('Error updating status:', error);
             alert('Failed to update status.');
         }
+    };
+
+    const handleSaveMeasurements = async () => {
+        if (!selectedCustomerId || !editingMeasurementGarment) return;
+        try {
+            const customer = customers.find(c => c.id === selectedCustomerId);
+            if (!customer) return;
+            const updatedMeasurements = {
+                ...(customer.measurements || {}),
+                [editingMeasurementGarment]: {
+                    ...measurementForm,
+                    lastUpdated: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                }
+            };
+            const { error } = await supabase
+                .from('customers')
+                .update({ measurements: updatedMeasurements })
+                .eq('id', selectedCustomerId);
+            if (error) console.warn('Could not save measurements (column may not exist yet):', error.message);
+            setCustomers(prev => prev.map(c =>
+                c.id === selectedCustomerId ? { ...c, measurements: updatedMeasurements } : c
+            ));
+            setEditingMeasurementGarment(null);
+            setMeasurementForm({});
+        } catch (error) {
+            console.error('Error saving measurements:', error);
+        }
+    };
+
+    const handleOrderCreated = (newOrder: Order, newCustomer?: Customer) => {
+        setOrders([newOrder, ...orders]);
+        if (newCustomer) {
+            setCustomers([newCustomer, ...customers]);
+        }
+    };
+
+    const handleCustomerCreated = (newCustomer: Customer) => {
+        setCustomers([newCustomer, ...customers]);
     };
 
     // Close menus when clicking outside
@@ -1131,278 +890,19 @@ export default function Dashboard() {
             </main>
 
             {/* New Customer Dialog */}
-            <Dialog open={isNewCustomerModalOpen} onOpenChange={setIsNewCustomerModalOpen}>
-                <DialogContent className="sm:max-w-md bg-[#fffdf9]">
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-bold text-slate-800 uppercase tracking-tight">Add Customer</DialogTitle>
-                        <DialogDescription className="text-slate-500 text-sm">Add a new client to your directory.</DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateCustomer} className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Full Name</label>
-                            <input
-                                required
-                                value={newCustomerForm.name}
-                                onChange={e => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })}
-                                className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800 transition-all font-medium"
-                                placeholder="e.g. Jane Doe"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Phone Number</label>
-                            <input
-                                type="tel"
-                                value={newCustomerForm.phone}
-                                onChange={e => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })}
-                                className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800 transition-all font-medium"
-                                placeholder="e.g. (555) 000-0000"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Email Address</label>
-                            <input
-                                type="email"
-                                value={newCustomerForm.email}
-                                onChange={e => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
-                                className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800 transition-all font-medium"
-                                placeholder="e.g. jane@example.com"
-                            />
-                        </div>
-                        <DialogFooter className="pt-6 flex flex-row justify-end gap-3">
-                            <Button type="button" variant="outline" onClick={() => setIsNewCustomerModalOpen(false)} className="font-bold uppercase tracking-wider w-fit">Cancel</Button>
-                            <Button type="submit" className="bg-orange-500 hover:bg-orange-600 font-bold uppercase tracking-wider w-fit">Save</Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <NewCustomerForm
+                isOpen={isNewCustomerModalOpen}
+                onOpenChange={setIsNewCustomerModalOpen}
+                onCustomerCreated={handleCustomerCreated}
+            />
 
             {/* New Order Dialog */}
-            <Dialog open={isNewOrderModalOpen} onOpenChange={(open) => {
-                setIsNewOrderModalOpen(open);
-                if (!open) {
-                    setCustomerSearchQuery('');
-                    setShowCustomerSuggestions(false);
-                    setNewOrderForm({
-                        customerId: null,
-                        customerData: { name: '', phone: '', category: 'Adult' },
-                        showInlineCustomerForm: false,
-                        items: [],
-                        deliveryDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-                        advancePaid: 0,
-                        status: 'Received',
-                        isUrgent: false
-                    });
-                }
-            }}>
-                <DialogContent className="sm:max-w-lg bg-white p-0 overflow-hidden border border-stone-200 shadow-2xl rounded-xl">
-
-                    {/* Header */}
-                    <DialogHeader className="px-6 pt-5 pb-4 border-b border-stone-100">
-                        <DialogTitle className="text-base font-black text-gray-900 uppercase tracking-wide">New Order</DialogTitle>
-                        <p className="text-xs text-gray-400 font-medium mt-0.5">Fill in the details below to record a new tailoring order.</p>
-                    </DialogHeader>
-
-                    <div className="px-6 py-5 space-y-6 max-h-[72vh] overflow-y-auto">
-
-                        {/* ── SECTION 1: CUSTOMER ── */}
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">1 · Customer</p>
-
-                            {newOrderForm.customerId && !newOrderForm.showInlineCustomerForm ? (
-                                <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                                            <span className="text-xs font-black text-emerald-700">
-                                                {newOrderForm.customerData.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2)}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-black text-gray-900">{newOrderForm.customerData.name}</p>
-                                            <p className="text-[10px] font-bold text-gray-400">{newOrderForm.customerData.phone || 'No phone'}</p>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => { setNewOrderForm(p => ({ ...p, customerId: null })); setCustomerSearchQuery(''); }}
-                                        className="text-[10px] font-black text-gray-400 hover:text-red-500 uppercase tracking-widest transition-colors">
-                                        Change
-                                    </button>
-                                </div>
-                            ) : !newOrderForm.showInlineCustomerForm ? (
-                                <div className="relative">
-                                    <input autoFocus type="text"
-                                        placeholder="Search by name or phone…"
-                                        value={customerSearchQuery}
-                                        onChange={e => { setCustomerSearchQuery(e.target.value); setShowCustomerSuggestions(true); }}
-                                        onFocus={() => setShowCustomerSuggestions(true)}
-                                        className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-lg text-sm font-medium text-gray-900 outline-none focus:border-gray-400 focus:bg-white transition-all"
-                                    />
-                                    {showCustomerSuggestions && customerSearchQuery && (
-                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-lg shadow-lg z-50 max-h-44 overflow-y-auto">
-                                            {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
-                                                <button key={c.id} type="button" onClick={() => selectCustomer(c)}
-                                                    className="w-full px-4 py-2.5 hover:bg-stone-50 text-left flex justify-between items-center border-b border-stone-50 last:border-none">
-                                                    <span className="font-bold text-gray-800 text-sm">{c.name}</span>
-                                                    <span className="text-[10px] text-gray-400">{c.phone}</span>
-                                                </button>
-                                            )) : (
-                                                <button type="button"
-                                                    onClick={() => setNewOrderForm(prev => ({ ...prev, showInlineCustomerForm: true, customerData: { ...prev.customerData, name: customerSearchQuery } }))}
-                                                    className="w-full px-4 py-3 text-left text-orange-600 flex items-center gap-2 font-bold text-sm hover:bg-orange-50">
-                                                    <span className="text-lg leading-none font-black">+</span>
-                                                    <span>Create &quot;{customerSearchQuery}&quot;</span>
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            ) : null}
-
-                            {newOrderForm.showInlineCustomerForm && (
-                                <div className="border border-orange-200 bg-orange-50/40 rounded-lg p-4 space-y-3">
-                                    <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">New Customer</p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-[9px] font-bold text-gray-400 uppercase">Name *</label>
-                                            <input type="text" value={newOrderForm.customerData.name}
-                                                onChange={e => setNewOrderForm(p => ({ ...p, customerData: { ...p.customerData, name: e.target.value } }))}
-                                                className="mt-1 w-full px-3 py-2 bg-white border border-stone-200 rounded-md text-sm font-medium outline-none focus:border-gray-400" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[9px] font-bold text-gray-400 uppercase">Phone</label>
-                                            <input type="tel" value={newOrderForm.customerData.phone}
-                                                onChange={e => setNewOrderForm(p => ({ ...p, customerData: { ...p.customerData, phone: e.target.value } }))}
-                                                placeholder="Optional"
-                                                className="mt-1 w-full px-3 py-2 bg-white border border-stone-200 rounded-md text-sm font-medium outline-none focus:border-gray-400" />
-                                        </div>
-                                    </div>
-                                    <button type="button" onClick={() => setNewOrderForm(p => ({ ...p, showInlineCustomerForm: false }))}
-                                        className="text-[10px] text-gray-400 hover:text-gray-600 underline font-bold">Cancel</button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* ── SECTION 2: GARMENTS ── */}
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">2 · Garments</p>
-                            <div className="border border-stone-200 rounded-lg overflow-hidden">
-                                <div className="grid grid-cols-12 bg-stone-50 border-b border-stone-200 px-4 py-2">
-                                    <div className="col-span-1" />
-                                    <div className="col-span-4 text-[9px] font-black text-gray-400 uppercase tracking-widest">Item</div>
-                                    <div className="col-span-3 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</div>
-                                    <div className="col-span-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Price (₹)</div>
-                                </div>
-
-                                {(['Shirt', 'Pant', 'Kurta'] as const).map(type => {
-                                    const idx = newOrderForm.items.findIndex(i => i.garment_type === type);
-                                    const on = idx !== -1;
-                                    const cust = customers.find(c => c.id === newOrderForm.customerId);
-                                    const hasMeasures = cust?.measurements?.[type.toLowerCase() as 'shirt' | 'pant' | 'kurta'];
-                                    return (
-                                        <div key={type} className="grid grid-cols-12 items-center px-4 py-3 border-b border-stone-100 last:border-none hover:bg-stone-50/40 transition-colors">
-                                            <div className="col-span-1">
-                                                <input type="checkbox" checked={on} className="w-4 h-4 accent-gray-900 cursor-pointer"
-                                                    onChange={() => on
-                                                        ? setNewOrderForm(p => ({ ...p, items: p.items.filter(i => i.garment_type !== type) }))
-                                                        : setNewOrderForm(p => ({ ...p, items: [...p.items, { garment_type: type, quantity: 1, price: 0, fabric_source: 'Customer' }] }))
-                                                    } />
-                                            </div>
-                                            <div className="col-span-4 flex items-center gap-1.5">
-                                                <span className={`text-sm font-bold transition-colors ${on ? 'text-gray-900' : 'text-gray-300'}`}>{type}</span>
-                                                {newOrderForm.customerId && (hasMeasures
-                                                    ? <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">✓ Saved</span>
-                                                    : <span className="text-[9px] font-black text-amber-500 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">No size</span>
-                                                )}
-                                            </div>
-                                            <div className="col-span-3 px-2">
-                                                <input type="number" min="1" disabled={!on}
-                                                    value={on ? newOrderForm.items[idx].quantity : ''}
-                                                    onChange={e => { const u = [...newOrderForm.items]; u[idx].quantity = parseInt(e.target.value) || 1; setNewOrderForm(p => ({ ...p, items: u })); }}
-                                                    placeholder="1"
-                                                    className={`w-full text-center rounded-md py-1.5 text-sm font-bold outline-none transition-all ${on ? 'bg-white border border-stone-200 text-gray-900 focus:border-gray-400' : 'bg-transparent border-transparent text-gray-200'}`}
-                                                />
-                                            </div>
-                                            <div className="col-span-4 pl-2">
-                                                <div className={`flex items-center rounded-md border transition-all ${on ? 'bg-white border-stone-200 focus-within:border-gray-400' : 'border-transparent'}`}>
-                                                    <span className={`pl-2 text-sm font-bold ${on ? 'text-gray-400' : 'text-gray-200'}`}>₹</span>
-                                                    <input type="number" min="0" disabled={!on}
-                                                        value={on ? newOrderForm.items[idx].price : ''}
-                                                        onChange={e => { const u = [...newOrderForm.items]; u[idx].price = parseFloat(e.target.value) || 0; setNewOrderForm(p => ({ ...p, items: u })); }}
-                                                        placeholder="0"
-                                                        className="w-full pr-2 py-1.5 text-right text-sm font-black text-gray-900 bg-transparent outline-none disabled:text-gray-200"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-
-                                <div className="grid grid-cols-12 px-4 py-2.5 bg-stone-50 border-t border-stone-200">
-                                    <div className="col-span-8 text-[10px] font-black text-gray-500 uppercase tracking-widest">Total</div>
-                                    <div className="col-span-4 text-right text-sm font-black text-gray-900">₹{totalAmount.toLocaleString()}</div>
-                                </div>
-                            </div>
-                            {newOrderForm.items.length === 0 && (
-                                <p className="text-[10px] text-amber-500 font-bold">Select at least one garment.</p>
-                            )}
-                        </div>
-
-                        {/* ── SECTION 3: DELIVERY & PAYMENT ── */}
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">3 · Delivery &amp; Payment</p>
-                            <div className="border border-stone-200 rounded-lg divide-y divide-stone-100 overflow-hidden">
-                                <div className="flex items-center justify-between px-4 py-3">
-                                    <span className="text-sm font-bold text-gray-600">Delivery Date</span>
-                                    <input type="date" value={newOrderForm.deliveryDate}
-                                        onChange={e => setNewOrderForm(p => ({ ...p, deliveryDate: e.target.value }))}
-                                        className="text-sm font-black text-gray-900 bg-transparent outline-none focus:text-orange-600 cursor-pointer"
-                                    />
-                                </div>
-                                <div className="flex items-center justify-between px-4 py-3">
-                                    <span className="text-sm font-bold text-gray-600">Advance Paid</span>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-sm font-bold text-gray-400">₹</span>
-                                        <input type="number" min="0" value={newOrderForm.advancePaid}
-                                            onChange={e => setNewOrderForm(p => ({ ...p, advancePaid: parseFloat(e.target.value) || 0 }))}
-                                            className="w-24 text-right text-sm font-black text-gray-900 bg-stone-50 border border-stone-200 rounded-md px-2 py-1 outline-none focus:border-gray-400"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between px-4 py-3 bg-stone-50/70">
-                                    <div>
-                                        <p className="text-sm font-black text-gray-900">Balance Due</p>
-                                        <p className="text-[10px] font-bold text-gray-400">Total − Advance</p>
-                                    </div>
-                                    <span className={`text-xl font-black ${itemsRemainingBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                                        ₹{itemsRemainingBalance.toLocaleString()}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between px-4 py-3">
-                                    <span className="text-sm font-bold text-gray-600">Mark as Urgent</span>
-                                    <button type="button" onClick={() => setNewOrderForm(p => ({ ...p, isUrgent: !p.isUrgent }))}
-                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${newOrderForm.isUrgent ? 'bg-red-500' : 'bg-stone-200'}`}>
-                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${newOrderForm.isUrgent ? 'translate-x-6' : 'translate-x-1'}`} />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    {/* Footer */}
-                    <div className="px-6 py-4 border-t border-stone-100 bg-stone-50/50 flex items-center justify-between">
-                        <button type="button" onClick={() => setIsNewOrderModalOpen(false)}
-                            className="text-xs font-black text-gray-400 hover:text-gray-700 uppercase tracking-widest transition-colors">
-                            Cancel
-                        </button>
-                        <button type="button" onClick={handleSaveOrder}
-                            disabled={newOrderForm.items.length === 0 || (!newOrderForm.customerId && !newOrderForm.customerData.name)}
-                            className="px-8 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-black uppercase tracking-widest rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                            Save Order
-                        </button>
-                    </div>
-
-                </DialogContent>
-            </Dialog>
-
+            <NewOrderForm
+                isOpen={isNewOrderModalOpen}
+                onOpenChange={setIsNewOrderModalOpen}
+                onOrderCreated={handleOrderCreated}
+                customers={customers}
+            />
 
             {/* Measurement Edit Dialog */}
             <Dialog open={!!editingMeasurementGarment} onOpenChange={(open) => { if (!open) { setEditingMeasurementGarment(null); setMeasurementForm({}); } }}>
