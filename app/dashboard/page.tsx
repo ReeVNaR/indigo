@@ -211,7 +211,15 @@ export default function Dashboard() {
                 setOrders(formattedOrders);
                 setCustomers(customersData || []);
             } catch (error: any) {
-                console.error('Error fetching data:', error?.message || error);
+                console.group('Data Fetch Error Details');
+                console.error('Message:', error?.message || 'Unknown error');
+                console.error('Name:', error?.name);
+                console.error('Stack:', error?.stack);
+                console.error('Full Error Object:', error);
+                if (error?.message === 'Failed to fetch') {
+                    console.error('Hint: "Failed to fetch" usually means the Supabase server is unreachable, your internet is down, or there is a CORS issue. If using a free Supabase project, it might be paused due to inactivity.');
+                }
+                console.groupEnd();
             } finally {
                 setIsLoading(false);
             }
