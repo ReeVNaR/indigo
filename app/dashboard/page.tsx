@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
 import {
     Menu,
     LayoutDashboard,
@@ -159,6 +158,7 @@ export default function Dashboard() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [fetchError, setFetchError] = useState<string | null>(null);
     const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
     const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -178,48 +178,29 @@ export default function Dashboard() {
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
+            setFetchError(null);
             try {
-                const { data: ordersData, error: ordersError } = await supabase
-                    .from('orders')
-                    .select('*')
-                    .order('created_at', { ascending: false });
+                // Fetch Orders
+                const ordersRes = await fetch('/api/orders');
+                if (!ordersRes.ok) throw new Error('Failed to fetch orders');
+                const ordersData = await ordersRes.json();
 
-                if (ordersError) throw ordersError;
-
-                const formattedOrders: Order[] = (ordersData || []).map(order => ({
-                    id: order.id,
-                    customerName: order.customer_name,
-                    initial: order.customer_name ? order.customer_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) : 'XX',
-                    clothType: order.cloth_type,
-                    deliveryDate: order.delivery_date,
-                    amount: Number(order.amount),
-                    status: order.status as OrderStatus,
-                    isUrgent: order.is_urgent,
-                    // Map other fields as needed for the Order interface
-                    quantity: order.quantity,
-                    orderDate: order.order_date,
-                    advancePaid: order.advance_paid,
-                    clothSource: order.cloth_source
+                const formattedOrders: Order[] = (ordersData || []).map((order: any) => ({
+                    ...order,
+                    initial: order.customerName ? order.customerName.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) : 'XX',
+                    amount: Number(order.amount)
                 }));
 
-                const { data: customersData, error: customersError } = await supabase.from('customers').select('*');
-
-                if (customersError) {
-                    console.error('Error fetching customers:', customersError);
-                }
+                // Fetch Customers
+                const customersRes = await fetch('/api/customers');
+                if (!customersRes.ok) throw new Error('Failed to fetch customers');
+                const customersData = await customersRes.json();
 
                 setOrders(formattedOrders);
                 setCustomers(customersData || []);
             } catch (error: any) {
-                console.group('Data Fetch Error Details');
-                console.error('Message:', error?.message || 'Unknown error');
-                console.error('Name:', error?.name);
-                console.error('Stack:', error?.stack);
-                console.error('Full Error Object:', error);
-                if (error?.message === 'Failed to fetch') {
-                    console.error('Hint: "Failed to fetch" usually means the Supabase server is unreachable, your internet is down, or there is a CORS issue. If using a free Supabase project, it might be paused due to inactivity.');
-                }
-                console.groupEnd();
+                console.error('Data Fetch Error:', error);
+                setFetchError(error.message || 'Failed to connect to the database. Please ensure MongoDB is running and your MONGODB_URI is set.');
             } finally {
                 setIsLoading(false);
             }
@@ -270,8 +251,8 @@ export default function Dashboard() {
 
     const deleteOrder = async (id: string) => {
         try {
-            const { error } = await supabase.from('orders').delete().eq('id', id);
-            if (error) throw error;
+            const res = await fetch(`/api/orders?id=${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete order');
 
             setOrders(orders.filter(o => o.id !== id));
             setOpenMenuId(null);
@@ -283,12 +264,13 @@ export default function Dashboard() {
 
     const updateStatus = async (id: string, newStatus: OrderStatus) => {
         try {
-            const { error } = await supabase
-                .from('orders')
-                .update({ status: newStatus })
-                .eq('id', id);
+            const res = await fetch('/api/orders', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, status: newStatus })
+            });
 
-            if (error) throw error;
+            if (!res.ok) throw new Error('Failed to update status');
 
             setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus } : o));
             setOpenMenuId(null);
@@ -310,11 +292,15 @@ export default function Dashboard() {
                     lastUpdated: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
                 }
             };
-            const { error } = await supabase
-                .from('customers')
-                .update({ measurements: updatedMeasurements })
-                .eq('id', selectedCustomerId);
-            if (error) console.warn('Could not save measurements (column may not exist yet):', error.message);
+
+            const res = await fetch('/api/customers', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: selectedCustomerId, measurements: updatedMeasurements })
+            });
+
+            if (!res.ok) throw new Error('Failed to save measurements');
+
             setCustomers(prev => prev.map(c =>
                 c.id === selectedCustomerId ? { ...c, measurements: updatedMeasurements } : c
             ));
@@ -322,6 +308,7 @@ export default function Dashboard() {
             setMeasurementForm({});
         } catch (error) {
             console.error('Error saving measurements:', error);
+            alert('Failed to save measurements.');
         }
     };
 
@@ -488,6 +475,20 @@ export default function Dashboard() {
                 {isLoading ? (
                     <div className="flex items-center justify-center h-full">
                         <Loader2 className="w-12 h-12 text-orange-500 animate-spin" />
+                    </div>
+                ) : fetchError ? (
+                    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                        <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4">
+                            <Scissors className="w-8 h-8 rotate-45" />
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Connection Error</h2>
+                        <p className="text-gray-500 max-w-md mb-6">{fetchError}</p>
+                        <Button
+                            onClick={() => window.location.reload()}
+                            className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-6"
+                        >
+                            Retry Connection
+                        </Button>
                     </div>
                 ) : (
                     <div className="relative z-10 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-32 pt-20 lg:pt-8">

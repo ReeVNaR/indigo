@@ -10,7 +10,6 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog";
-import { supabase } from '@/lib/supabase';
 import { Customer } from '@/lib/types';
 import { Plus } from "lucide-react";
 
@@ -32,35 +31,38 @@ export default function NewCustomerForm({ isOpen, onOpenChange, onCustomerCreate
         e.preventDefault();
         setIsSaving(true);
         try {
-            const { data, error } = await supabase
-                .from('customers')
-                .insert([{
+            const res = await fetch('/api/customers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     name: newCustomerForm.name,
                     email: newCustomerForm.email,
-                    phone: newCustomerForm.phone
-                }])
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            if (data) {
-                const newCustomer: Customer = {
-                    id: data.id,
-                    name: data.name,
-                    email: data.email || '',
-                    phone: data.phone || '',
+                    phone: newCustomerForm.phone,
                     ordersCount: 0,
                     totalSpent: 0,
                     lastOrderDate: ''
+                })
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || 'Failed to create customer');
+            }
+
+            const data = await res.json();
+
+            if (data) {
+                const newCustomer: Customer = {
+                    ...data,
+                    id: data.id || data._id // Ensure we have a string ID
                 };
                 onCustomerCreated(newCustomer);
                 onOpenChange(false);
                 setNewCustomerForm({ name: '', email: '', phone: '' });
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating customer:', error);
-            alert('Failed to create customer.');
+            alert(`Failed to create customer: ${error.message}`);
         } finally {
             setIsSaving(false);
         }

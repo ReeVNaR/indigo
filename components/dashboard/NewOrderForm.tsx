@@ -7,7 +7,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { supabase } from '@/lib/supabase';
 import { Customer, Order, OrderStatus } from '@/lib/types';
 import {
     Search,
@@ -144,27 +143,26 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
 
             // 1. Create customer if needed
             if (!finalCustomerId && newOrderForm.customerData.name) {
-                const { data: customer, error: custError } = await supabase
-                    .from('customers')
-                    .insert([{
+                const custRes = await fetch('/api/customers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
                         name: newOrderForm.customerData.name,
                         phone: newOrderForm.customerData.phone,
-                        email: `${newOrderForm.customerData.name.toLowerCase().replace(/\s+/g, '.')}@example.com`
-                    }])
-                    .select()
-                    .single();
+                        email: `${newOrderForm.customerData.name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+                        ordersCount: 0,
+                        totalSpent: 0,
+                        lastOrderDate: ''
+                    })
+                });
 
-                if (custError) throw custError;
+                if (!custRes.ok) throw new Error('Failed to create customer');
+                const customerData = await custRes.json();
 
-                finalCustomerId = customer.id;
+                finalCustomerId = customerData.id;
                 newCustomer = {
-                    id: customer.id,
-                    name: customer.name,
-                    email: customer.email || '',
-                    phone: customer.phone || '',
-                    ordersCount: 0,
-                    totalSpent: 0,
-                    lastOrderDate: ''
+                    ...customerData,
+                    id: customerData.id
                 };
             }
 
@@ -172,64 +170,42 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
 
             // 2. Create Order
             const newOrderPayload = {
-                customer_id: finalCustomerId,
-                customer_name: newOrderForm.customerData.name,
-                delivery_date: newOrderForm.deliveryDate,
-                order_date: new Date().toISOString().split('T')[0],
+                customerId: finalCustomerId,
+                customerName: newOrderForm.customerData.name,
+                deliveryDate: newOrderForm.deliveryDate,
+                orderDate: new Date().toISOString().split('T')[0],
                 amount: totalAmount,
-                advance_paid: newOrderForm.advancePaid,
+                advancePaid: newOrderForm.advancePaid,
                 status: newOrderForm.status,
-                is_urgent: newOrderForm.isUrgent,
-                cloth_type: newOrderForm.items.map(i => i.garment_type).join(', '),
+                isUrgent: newOrderForm.isUrgent,
+                clothType: newOrderForm.items.map(i => i.garment_type).join(', '),
                 quantity: newOrderForm.items.reduce((s, i) => s + i.quantity, 0),
-                cloth_source: newOrderForm.items[0]?.fabric_source || 'Customer'
+                clothSource: newOrderForm.items[0]?.fabric_source || 'Customer'
+                // Note: MongoDB handles item storage differently or we could add an 'items' array here
             };
 
-            const { data: orderData, error: orderError } = await supabase
-                .from('orders')
-                .insert([newOrderPayload])
-                .select()
-                .single();
+            const orderRes = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newOrderPayload)
+            });
 
-            if (orderError) throw orderError;
+            if (!orderRes.ok) throw new Error('Failed to create order');
+            const orderData = await orderRes.json();
 
-            // 3. Create Order Items
-            if (newOrderForm.items.length > 0) {
-                const itemsPayload = newOrderForm.items.map(item => ({
-                    order_id: orderData.id,
-                    garment_type: item.garment_type,
-                    quantity: item.quantity,
-                    price: item.price,
-                    fabric_source: item.fabric_source
-                }));
-
-                const { error: itemsError } = await supabase.from('order_items').insert(itemsPayload);
-                if (itemsError) console.warn('Order items table might not exist or error:', itemsError.message);
-            }
-
-            // 4. Callback
-            const initials = orderData.customer_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2);
+            // 3. Callback
+            const initials = orderData.customerName.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2);
             const newOrder: Order = {
-                id: orderData.id,
-                customerName: orderData.customer_name,
-                initial: initials || 'XX',
-                clothType: orderData.cloth_type,
-                deliveryDate: orderData.delivery_date,
-                amount: orderData.amount,
-                status: orderData.status as OrderStatus,
-                isUrgent: orderData.is_urgent,
-                quantity: orderData.quantity,
-                orderDate: orderData.order_date,
-                advancePaid: orderData.advance_paid,
-                clothSource: orderData.cloth_source
+                ...orderData,
+                initial: initials || 'XX'
             };
 
             onOrderCreated(newOrder, newCustomer);
             onOpenChange(false);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving order:', error);
-            alert('Failed to save order.');
+            alert(`Failed to save order: ${error.message}`);
         } finally {
             setIsSaving(false);
         }
