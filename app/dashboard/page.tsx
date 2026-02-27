@@ -88,7 +88,11 @@ const ArrowRightIcon = () => (
 );
 
 // --- Sidebar Content ---
-const SidebarContent = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, setActiveTab: (id: string) => void, onLogout: () => void }) => {
+const SidebarContent = ({ activeTab, setActiveTab, onLogout, shopName, masterTailor }: { activeTab: string, setActiveTab: (id: string) => void, onLogout: () => void, shopName: string, masterTailor: string }) => {
+    const shopNameParts = shopName.split(' ');
+    const shopPrimaryName = shopNameParts[0] || 'Shop';
+    const shopSecondaryName = shopNameParts.slice(1).join(' ') || '';
+
     return (
         <>
             {/* Selvedge Strip */}
@@ -101,11 +105,11 @@ const SidebarContent = ({ activeTab, setActiveTab, onLogout }: { activeTab: stri
             {/* Logo */}
             <div className="h-28 flex items-center px-4 border-b border-white/5 relative">
                 <div className="w-14 h-14 rounded-full bg-[#131b2e] flex items-center justify-center mr-4 border border-amber-100/20 shadow-xl overflow-hidden shrink-0">
-                    <img src="/Logo.png" alt="Dadashri" className="w-full h-full object-contain scale-125" />
+                    <img src="/Logo.png" alt={shopPrimaryName} className="w-full h-full object-contain scale-125" />
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-gray-200 font-bold text-2xl leading-none tracking-tight">Dadashri</span>
-                    <span className="text-orange-400 text-[10px] font-bold uppercase tracking-[0.15em] mt-1">Designers</span>
+                    <span className="text-gray-200 font-bold text-2xl leading-none tracking-tight">{shopPrimaryName}</span>
+                    {shopSecondaryName && <span className="text-orange-400 text-[10px] font-bold uppercase tracking-[0.15em] mt-1">{shopSecondaryName}</span>}
                 </div>
             </div>
 
@@ -133,10 +137,10 @@ const SidebarContent = ({ activeTab, setActiveTab, onLogout }: { activeTab: stri
             <div className="p-4 mb-2 relative">
                 <div className="flex items-center p-3 rounded-xl bg-[#00000033] border border-white/5 backdrop-blur-sm">
                     <Avatar className="w-10 h-10 border-2 border-orange-400/30">
-                        <AvatarFallback className="bg-orange-200 text-orange-800 font-bold">D</AvatarFallback>
+                        <AvatarFallback className="bg-orange-200 text-orange-800 font-bold">{masterTailor ? masterTailor[0].toUpperCase() : 'M'}</AvatarFallback>
                     </Avatar>
                     <div className="ml-3 flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">Dadashri</p>
+                        <p className="text-sm font-medium text-white truncate">{masterTailor}</p>
                         <p className="text-xs text-gray-400 truncate">Master Tailor</p>
                     </div>
                     <Button variant="ghost" size="icon" onClick={onLogout} className="text-gray-400 hover:text-white hover:bg-white/10" title="Logout">
@@ -163,6 +167,9 @@ export default function Dashboard() {
     const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+    const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
+    const [isEditCustomerModalOpen, setIsEditCustomerModalOpen] = useState(false);
+    const [editCustomerForm, setEditCustomerForm] = useState({ name: '', phone: '', email: '' });
 
     const [settingsForm, setSettingsForm] = useState({
         shopName: 'Dadashri Designers',
@@ -280,6 +287,28 @@ export default function Dashboard() {
         }
     };
 
+    const handleSaveCustomerProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedCustomerId) return;
+        try {
+            const res = await fetch('/api/customers', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: selectedCustomerId, name: editCustomerForm.name, phone: editCustomerForm.phone, email: editCustomerForm.email })
+            });
+
+            if (!res.ok) throw new Error('Failed to update customer');
+
+            setCustomers(prev => prev.map(c =>
+                c.id === selectedCustomerId ? { ...c, ...editCustomerForm } : c
+            ));
+            setIsEditCustomerModalOpen(false);
+        } catch (error) {
+            console.error('Error updating customer:', error);
+            alert('Failed to update customer.');
+        }
+    };
+
     const handleSaveMeasurements = async () => {
         if (!selectedCustomerId || !editingMeasurementGarment) return;
         try {
@@ -377,15 +406,15 @@ export default function Dashboard() {
                             ) : displayOrders.map((order) => (
                                 <TableRow key={order.id} className="hover:bg-stone-50/50 transition-colors">
                                     <TableCell className="px-3 sm:px-6 py-4">
-                                        <div className="flex items-center">
-                                            <Avatar className="w-8 h-8 rounded shrink-0 mr-3">
-                                                <AvatarFallback className={`text-[10px] font-bold ${order.isUrgent ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                                        <div className="flex items-center cursor-pointer group" onClick={() => setSelectedOrderForDetails(order)}>
+                                            <Avatar className="w-8 h-8 rounded-full shrink-0 mr-3 group-hover:ring-2 ring-orange-400 transition-all">
+                                                <AvatarFallback className={`text-[10px] font-bold transition-colors ${order.isUrgent ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500 group-hover:bg-amber-100 group-hover:text-amber-700'}`}>
                                                     {order.initial}
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div>
-                                                <span className="font-semibold text-gray-900 block text-xs sm:text-sm">{order.customerName}</span>
-                                                {order.isUrgent && <Badge variant="destructive" className="h-4 text-[8px] px-1 uppercase tracking-[0.1em]">Urgent</Badge>}
+                                                <span className="font-semibold text-gray-900 block text-xs sm:text-sm group-hover:text-orange-600 transition-colors">{order.customerName}</span>
+                                                {order.isUrgent && <Badge variant="destructive" className="h-4 text-[8px] px-1 uppercase tracking-[0.1em] mt-0.5">Urgent</Badge>}
                                             </div>
                                         </div>
                                     </TableCell>
@@ -426,6 +455,10 @@ export default function Dashboard() {
         );
     }
 
+    const shopNameParts = settingsForm.shopName.split(' ');
+    const shopPrimaryName = shopNameParts[0] || 'Shop';
+    const shopSecondaryName = shopNameParts.slice(1).join(' ') || '';
+
     return (
         <div className="flex w-full min-h-screen font-sans bg-[#fdfbf7] relative">
 
@@ -433,11 +466,11 @@ export default function Dashboard() {
             <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-denim z-40 flex items-center justify-between px-4 border-b border-white/10 shadow-lg">
                 <div className="flex items-center">
                     <div className="w-10 h-10 rounded-full bg-[#131b2e] flex items-center justify-center mr-3 border border-amber-100/20 shadow-md">
-                        <img src="/Logo.png" alt="Dadashri" className="w-8 h-8 object-contain" />
+                        <img src="/Logo.png" alt={shopPrimaryName} className="w-8 h-8 object-contain" />
                     </div>
                     <div className="flex flex-col">
-                        <span className="text-gray-200 font-bold text-base leading-none tracking-tight">Dadashri</span>
-                        <span className="text-orange-400 text-[10px] font-bold uppercase tracking-[0.1em] mt-0.5">Designers</span>
+                        <span className="text-gray-200 font-bold text-base leading-none tracking-tight">{shopPrimaryName}</span>
+                        {shopSecondaryName && <span className="text-orange-400 text-[10px] font-bold uppercase tracking-[0.1em] mt-0.5">{shopSecondaryName}</span>}
                     </div>
                 </div>
 
@@ -453,6 +486,8 @@ export default function Dashboard() {
                             activeTab={activeTab}
                             setActiveTab={setActiveTab}
                             onLogout={() => router.push('/')}
+                            shopName={settingsForm.shopName}
+                            masterTailor={settingsForm.masterTailor}
                         />
                     </SheetContent>
                 </Sheet>
@@ -464,6 +499,8 @@ export default function Dashboard() {
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
                     onLogout={() => router.push('/')}
+                    shopName={settingsForm.shopName}
+                    masterTailor={settingsForm.masterTailor}
                 />
             </aside>
 
@@ -505,7 +542,7 @@ export default function Dashboard() {
                                     ) : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
                                 </h1>
                                 <p className="text-gray-500 mt-1 font-medium">
-                                    {activeTab === 'dashboard' ? 'Welcome back, Dadashri.' : `Manage your ${activeTab}.`}
+                                    {activeTab === 'dashboard' ? `Welcome back, ${settingsForm.masterTailor}.` : `Manage your ${activeTab}.`}
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-3">
@@ -647,8 +684,22 @@ export default function Dashboard() {
                                                         <div className="flex items-center gap-2">
                                                             <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">{customer.name}</h2>
                                                             <Badge variant="outline" className="text-[10px] font-bold text-gray-500 border-stone-200">CUSTOMER</Badge>
+                                                            <button
+                                                                title="Edit Customer Details"
+                                                                onClick={() => {
+                                                                    setEditCustomerForm({ name: customer.name, phone: customer.phone, email: customer.email });
+                                                                    setIsEditCustomerModalOpen(true);
+                                                                }}
+                                                                className="ml-2 w-7 h-7 rounded-md bg-stone-50 border border-stone-200 flex items-center justify-center text-stone-400 hover:text-orange-500 hover:border-orange-200 hover:bg-orange-50 transition-colors shadow-sm"
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                                            </button>
                                                         </div>
-                                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">{customer.phone}</p>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{customer.phone}</p>
+                                                            <span className="text-[10px] text-gray-300">|</span>
+                                                            <p className="text-[10px] font-bold text-gray-400">{customer.email}</p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-2 w-full sm:w-auto">
@@ -793,87 +844,71 @@ export default function Dashboard() {
 
                         {/* View: Settings */}
                         {activeTab === 'settings' && (
-                            <div className="max-w-4xl mx-auto">
-                                <form onSubmit={handleSaveSettings} className="space-y-6">
-                                    {/* Workshop Details Card */}
-                                    <div className="bg-white rounded-xl shadow-sm border border-stone-100 relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
-                                        <div className="p-8">
-                                            <div className="flex items-center mb-8">
-                                                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 mr-4">
-                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Workshop Profile</h3>
-                                                    <p className="text-sm text-gray-500 font-medium">Manage your shop identity and contact details.</p>
-                                                </div>
+                            <div className="max-w-6xl mx-auto">
+                                <form onSubmit={handleSaveSettings} className="flex flex-col md:flex-row gap-6 items-stretch">
+                                    {/* Left Side: Logo */}
+                                    <div className="w-full md:w-1/2">
+                                        <div className="bg-white rounded-xl shadow-sm border border-stone-100 relative overflow-hidden flex flex-col items-center justify-center p-8 text-center h-full">
+                                            <div className="w-40 h-40 rounded-full bg-[#131b2e] flex items-center justify-center border-4 border-amber-100/20 shadow-xl overflow-hidden mb-6">
+                                                <img src="/Logo.png" alt="Dadashri" className="w-24 h-24 object-contain" />
                                             </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                                <div>
-                                                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Shop Name</label>
-                                                    <input type="text" value={settingsForm.shopName} onChange={e => setSettingsForm({ ...settingsForm, shopName: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-medium transition-all" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Master Tailor</label>
-                                                    <input type="text" value={settingsForm.masterTailor} onChange={e => setSettingsForm({ ...settingsForm, masterTailor: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-medium transition-all" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Phone Number</label>
-                                                    <input type="tel" value={settingsForm.phone} onChange={e => setSettingsForm({ ...settingsForm, phone: e.target.value })} className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-medium transition-all" />
-                                                </div>
-                                            </div>
+                                            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">{settingsForm.shopName}</h3>
+                                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">EST. 2024</p>
                                         </div>
                                     </div>
 
-                                    {/* Preferences Card */}
-                                    <div className="bg-white rounded-xl shadow-sm border border-stone-100 relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-1 h-full bg-stone-400"></div>
-                                        <div className="p-8">
-                                            <div className="flex items-center mb-8">
-                                                <div className="w-12 h-12 bg-stone-100 rounded-lg flex items-center justify-center text-stone-600 mr-4">
-                                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">System Preferences</h3>
-                                                    <p className="text-sm text-gray-500 font-medium">Customize your dashboard experience.</p>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSettingsForm({ ...settingsForm, notifications: !settingsForm.notifications })}>
-                                                    <div className="flex items-center">
-                                                        <div className={`w-10 h-6 rounded-full p-1 transition-colors ${settingsForm.notifications ? 'bg-emerald-500' : 'bg-gray-300'}`}>
-                                                            <div className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${settingsForm.notifications ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                                    {/* Right Side: Workshop Profile */}
+                                    <div className="w-full md:w-1/2 flex flex-col h-full gap-6">
+                                        <div className="flex flex-col justify-between h-full space-y-6">
+                                            {/* Workshop Details Card */}
+                                            <div className="bg-white rounded-xl shadow-sm border border-stone-100 relative overflow-hidden flex-1">
+                                                <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
+                                                <div className="p-8">
+                                                    <div className="flex items-center mb-8">
+                                                        <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 mr-4">
+                                                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                                                         </div>
-                                                        <div className="ml-4">
-                                                            <p className="text-sm font-bold text-gray-900">Email Notifications</p>
-                                                            <p className="text-xs text-gray-500">Receive updates about new orders and urgent deadlines.</p>
+                                                        <div>
+                                                            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Workshop Profile</h3>
+                                                            <p className="text-sm text-gray-500 font-medium">Manage your shop identity and contact details.</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-6">
+                                                        <div>
+                                                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Shop Name</label>
+                                                            <input type="text" value={settingsForm.shopName} onChange={e => setSettingsForm({ ...settingsForm, shopName: e.target.value })} className="w-full px-4 py-3 border border-stone-200 text-[13px] rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-bold transition-all bg-stone-50 focus:bg-white" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Master Tailor</label>
+                                                            <input type="text" value={settingsForm.masterTailor} onChange={e => setSettingsForm({ ...settingsForm, masterTailor: e.target.value })} className="w-full px-4 py-3 border border-stone-200 text-[13px] rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-bold transition-all bg-stone-50 focus:bg-white" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Phone Number</label>
+                                                            <input type="tel" value={settingsForm.phone} onChange={e => setSettingsForm({ ...settingsForm, phone: e.target.value })} className="w-full px-4 py-3 border border-stone-200 text-[13px] rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-bold transition-all bg-stone-50 focus:bg-white" />
                                                         </div>
                                                     </div>
                                                 </div>
+                                            </div>
 
-                                                {/* Currency selection removed */}
+                                            {/* Save Bar */}
+                                            <div className="flex justify-end pt-2">
+                                                <button
+                                                    type="submit"
+                                                    disabled={isSavingSettings}
+                                                    className="bg-gray-900 text-white px-8 py-3.5 rounded-lg shadow-lg hover:bg-black font-black uppercase tracking-widest text-[11px] flex items-center transition-all disabled:opacity-70 disabled:cursor-not-allowed w-full sm:w-auto justify-center"
+                                                >
+                                                    {isSavingSettings ? (
+                                                        <>
+                                                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></span>
+                                                            Saving...
+                                                        </>
+                                                    ) : (
+                                                        'Save Changes'
+                                                    )}
+                                                </button>
                                             </div>
                                         </div>
-                                    </div>
-
-                                    {/* Save Bar */}
-                                    <div className="flex justify-end pt-4">
-                                        <button
-                                            type="submit"
-                                            disabled={isSavingSettings}
-                                            className="bg-gray-900 text-white px-8 py-3 rounded-lg shadow-lg hover:bg-black font-bold uppercase tracking-wide text-sm flex items-center transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-                                        >
-                                            {isSavingSettings ? (
-                                                <>
-                                                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></span>
-                                                    Saving...
-                                                </>
-                                            ) : (
-                                                'Save Changes'
-                                            )}
-                                        </button>
                                     </div>
                                 </form>
                             </div>
@@ -912,6 +947,197 @@ export default function Dashboard() {
                 onOrderCreated={handleOrderCreated}
                 customers={customers}
             />
+
+            {/* Order Details & Measurements Dialog */}
+            <Dialog open={!!selectedOrderForDetails} onOpenChange={(open) => !open && setSelectedOrderForDetails(null)}>
+                <DialogContent showCloseButton={false} className="sm:max-w-3xl bg-white p-0 overflow-hidden border-none shadow-2xl rounded-xl">
+                    <DialogTitle className="sr-only">Order Details</DialogTitle>
+                    <div className="flex flex-col max-h-[85vh]">
+                        {/* Header */}
+                        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center z-20">
+                            <div className="flex items-center gap-3">
+                                <div className="h-8 w-8 rounded-lg bg-[#131b2e] flex items-center justify-center text-white shadow-md">
+                                    <Package className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-[#131b2e] uppercase tracking-tight leading-none">Order Information</h2>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setSelectedOrderForDetails(null)}
+                                className="p-1.5 hover:bg-slate-200 rounded-full transition-colors focus:ring-2 focus:ring-orange-500/20 outline-none"
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 hover:text-slate-600">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar">
+                            {selectedOrderForDetails && (() => {
+                                const customer = customers.find(c => c.name === selectedOrderForDetails.customerName);
+                                const garments = selectedOrderForDetails.clothType.split(', ').map(s => s.trim().toLowerCase());
+
+                                return (
+                                    <div className="space-y-8">
+                                        {/* Order Info Panel */}
+                                        <div className="bg-white border-2 border-stone-100 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 group">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center border-2 border-orange-200/50 shadow-inner">
+                                                    <span className="text-xl font-black text-orange-600 uppercase">
+                                                        {selectedOrderForDetails.initial}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h2 className="text-lg font-black text-gray-900 uppercase tracking-tight">{selectedOrderForDetails.customerName}</h2>
+                                                    <div className="flex flex-wrap gap-2 mt-1">
+                                                        <Badge variant="outline" className="text-[10px] font-bold text-gray-500 border-stone-200 bg-stone-50">{selectedOrderForDetails.clothType}</Badge>
+                                                        {selectedOrderForDetails.isUrgent && <Badge className="text-[10px] bg-gradient-to-r from-red-500 to-orange-500 text-white border-none font-bold uppercase shadow-sm">Express</Badge>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-left sm:text-right w-full sm:w-auto p-4 sm:p-0 bg-stone-50 sm:bg-transparent rounded-xl border sm:border-none border-stone-100">
+                                                <div className="flex justify-between sm:block">
+                                                    <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest sm:block mb-1">Total Valuation</span>
+                                                    <span className="text-xl sm:text-2xl font-black text-[#131b2e]">₹{selectedOrderForDetails.amount.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between sm:block items-center mt-3 sm:mt-2">
+                                                    <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest sm:hidden">Delivery Date</span>
+                                                    <span className="text-xs font-bold text-orange-600 uppercase tracking-widest bg-orange-50 px-2.5 py-1 rounded-sm border border-orange-100">Due: {selectedOrderForDetails.deliveryDate}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Customer Measurments */}
+                                        {customer && (
+                                            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                                <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                                                    <h3 className="text-xs font-black text-[#131b2e] uppercase tracking-widest flex items-center gap-2">
+                                                        <Scissors className="w-4 h-4 text-orange-500" />
+                                                        Client Measurements
+                                                    </h3>
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{customer.phone}</span>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                                    {/* We'll try to show all standard garment measurements, highlighting ordered ones */}
+                                                    {(['shirt', 'pant', 'kurta'] as const).map((type) => {
+                                                        const data = customer.measurements?.[type] as any;
+                                                        const isOrdered = garments.includes(type);
+                                                        if (!isOrdered && !data) return null; // Only show if they ordered it OR if it exists
+
+                                                        const fields = type === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
+                                                            type === 'pant' ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] :
+                                                                ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'];
+
+                                                        return (
+                                                            <div key={type} className={`
+                                                                relative bg-white border-2 rounded-2xl overflow-hidden shadow-sm transition-all duration-300
+                                                                ${isOrdered ? 'border-[#131b2e]' : 'border-stone-100 opacity-80'}
+                                                            `}>
+                                                                {isOrdered && <div className="absolute top-0 right-0 right-1 top-1 w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)] animate-pulse"></div>}
+                                                                <div className={`px-4 py-3 border-b flex justify-between items-center ${isOrdered ? 'bg-slate-50 border-stone-200' : 'bg-stone-50 border-stone-100'}`}>
+                                                                    <span className={`text-[11px] font-black uppercase tracking-widest ${isOrdered ? 'text-[#131b2e]' : 'text-stone-400'}`}>{type}</span>
+                                                                    {!data && <span className="text-[9px] font-bold text-red-500 uppercase px-1.5 py-0.5 rounded bg-red-50">Pending</span>}
+                                                                </div>
+                                                                <div className="p-4 bg-white">
+                                                                    {data ? (
+                                                                        <div className="space-y-1.5 h-auto min-h-[140px]">
+                                                                            {fields.map((field, i) => (
+                                                                                <div key={field} className="flex justify-between border-b border-stone-100 pb-1.5 last:border-none focus-within:bg-orange-50 transition-colors rounded px-1 -mx-1">
+                                                                                    <span className="text-[10px] font-bold text-slate-400 capitalize">{field}</span>
+                                                                                    <span className="text-xs font-black text-slate-800">{data[field] || '—'}&quot;</span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="h-[140px] flex items-center justify-center text-center">
+                                                                            <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest leading-relaxed">Required<br />Needs Update</span>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="mt-3 pt-3 flex justify-between items-center text-[9px] font-bold text-slate-400 border-t border-stone-100">
+                                                                        <div className="uppercase tracking-widest flex flex-col">
+                                                                            <span>Updated</span>
+                                                                            <span>{data?.lastUpdated || 'Never'}</span>
+                                                                        </div>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => {
+                                                                                setSelectedCustomerId(customer.id);
+                                                                                setEditingMeasurementGarment(type);
+                                                                                setMeasurementForm(data || {});
+                                                                            }}
+                                                                            className="h-7 px-3 text-[9px] font-black uppercase tracking-widest border-stone-200 hover:bg-stone-50"
+                                                                        >
+                                                                            Edit
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {!customer && (
+                                            <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl text-center">
+                                                <p className="text-xs font-bold text-orange-600 uppercase tracking-widest">Customer profile not found for measurement sync</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Customer Dialog */}
+            <Dialog open={isEditCustomerModalOpen} onOpenChange={setIsEditCustomerModalOpen}>
+                <DialogContent showCloseButton={true} className="sm:max-w-md bg-white border border-stone-200 p-0 overflow-hidden shadow-2xl rounded-xl">
+                    <DialogHeader className="px-5 py-4 border-b border-stone-100 bg-stone-50/50">
+                        <DialogTitle className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                            Edit Customer Profile
+                        </DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleSaveCustomerProfile} className="px-5 py-4 space-y-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Full Name</label>
+                            <input
+                                required
+                                value={editCustomerForm.name}
+                                onChange={e => setEditCustomerForm({ ...editCustomerForm, name: e.target.value })}
+                                className="w-full px-3 py-2 text-sm font-bold text-gray-900 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:bg-white focus:border-orange-400 transition-colors"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Phone Number</label>
+                            <input
+                                type="tel"
+                                value={editCustomerForm.phone}
+                                onChange={e => setEditCustomerForm({ ...editCustomerForm, phone: e.target.value })}
+                                className="w-full px-3 py-2 text-sm font-bold text-gray-900 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:bg-white focus:border-orange-400 transition-colors"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Email Address</label>
+                            <input
+                                type="email"
+                                value={editCustomerForm.email}
+                                onChange={e => setEditCustomerForm({ ...editCustomerForm, email: e.target.value })}
+                                className="w-full px-3 py-2 text-sm font-bold text-gray-900 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:bg-white focus:border-orange-400 transition-colors"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                            <Button type="button" variant="outline" onClick={() => setIsEditCustomerModalOpen(false)} className="py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-stone-200 hover:bg-stone-50 transition-colors">Cancel</Button>
+                            <Button type="submit" className="py-2.5 text-[10px] font-black text-white bg-gray-900 uppercase tracking-widest hover:bg-black transition-colors">Save Changes</Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {/* Measurement Edit Dialog */}
             <Dialog open={!!editingMeasurementGarment} onOpenChange={(open) => { if (!open) { setEditingMeasurementGarment(null); setMeasurementForm({}); } }}>

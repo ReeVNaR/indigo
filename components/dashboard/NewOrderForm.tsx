@@ -212,7 +212,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
     // ─── RENDERERS ───
 
     const renderStep1 = () => (
-        <div className="space-y-6">
+        <div className="space-y-6 min-h-[350px]">
             <div className="text-center space-y-2">
                 <h3 className="text-xl font-black text-[#131c3f] uppercase tracking-tight">Customer Information</h3>
                 <p className="text-sm text-slate-500">Search existing customers or create a new profile.</p>
@@ -553,7 +553,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-xl bg-white p-0 overflow-hidden border-none shadow-2xl rounded-xl">
+            <DialogContent showCloseButton={false} className="sm:max-w-xl bg-white p-0 overflow-hidden border-none shadow-2xl rounded-xl">
+                <DialogTitle className="sr-only">New Order</DialogTitle>
                 <div className="flex flex-col h-[80vh] md:h-auto max-h-[85vh]">
                     {/* Header */}
                     <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center z-20">
