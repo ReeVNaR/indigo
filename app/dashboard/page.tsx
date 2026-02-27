@@ -18,7 +18,9 @@ import {
     MoreVertical,
     Trash2,
     Loader2,
-    Search
+    Search,
+    CreditCard,
+    Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -157,7 +159,10 @@ export default function Dashboard() {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [activeProfileTab, setActiveProfileTab] = useState<'measures' | 'history'>('measures');
-    const [editingMeasurementGarment, setEditingMeasurementGarment] = useState<'shirt' | 'pant' | 'kurta' | null>(null);
+    const [editingMeasurementGarment, setEditingMeasurementGarment] = useState<'shirt' | 'pant' | 'kurta' | 'suit' | 'vest' | 'custom' | null>(null);
+    const [editingCustomGarmentId, setEditingCustomGarmentId] = useState<string | null>(null);
+    const [customGarmentName, setCustomGarmentName] = useState<string>('');
+    const [customCategory, setCustomCategory] = useState<'top' | 'bottom'>('top');
     const [measurementForm, setMeasurementForm] = useState<any>({});
     const [orders, setOrders] = useState<Order[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -170,6 +175,11 @@ export default function Dashboard() {
     const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
     const [isEditCustomerModalOpen, setIsEditCustomerModalOpen] = useState(false);
     const [editCustomerForm, setEditCustomerForm] = useState({ name: '', phone: '', email: '', address: '', notes: '' });
+    const [statusFilter, setStatusFilter] = useState<OrderStatus | 'All'>('All');
+    const [deliveryFilter, setDeliveryFilter] = useState<'All' | 'Today' | 'This Week' | 'Overdue'>('All');
+    const [isRecordingPayment, setIsRecordingPayment] = useState(false);
+    const [paymentAmount, setPaymentAmount] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online' | 'Card'>('Cash');
 
     const [settingsForm, setSettingsForm] = useState({
         shopName: 'Dadashri Designers',
@@ -216,16 +226,51 @@ export default function Dashboard() {
         fetchData();
     }, []);
 
-    // -- Global Search Filtering --
+    // -- Global Search and Filtered Orders --
     const filteredOrders = useMemo(() => {
-        if (!globalSearchQuery) return orders;
-        const query = globalSearchQuery.toLowerCase();
-        return orders.filter(o =>
-            o.customerName.toLowerCase().includes(query) ||
-            o.clothType.toLowerCase().includes(query) ||
-            o.status.toLowerCase().includes(query)
-        );
-    }, [orders, globalSearchQuery]);
+        let result = orders;
+
+        // Status Filter
+        if (statusFilter !== 'All') {
+            result = result.filter(o => o.status === statusFilter);
+        }
+
+        // Delivery Date Filter
+        if (deliveryFilter !== 'All') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            result = result.filter(o => {
+                const deliveryDate = new Date(o.deliveryDate);
+                deliveryDate.setHours(0, 0, 0, 0);
+
+                if (deliveryFilter === 'Today') {
+                    return deliveryDate.getTime() === today.getTime();
+                }
+                if (deliveryFilter === 'Overdue') {
+                    return deliveryDate < today && o.status !== 'Completed';
+                }
+                if (deliveryFilter === 'This Week') {
+                    const nextWeek = new Date(today);
+                    nextWeek.setDate(today.getDate() + 7);
+                    return deliveryDate >= today && deliveryDate <= nextWeek;
+                }
+                return true;
+            });
+        }
+
+        // Search Query
+        if (globalSearchQuery) {
+            const query = globalSearchQuery.toLowerCase();
+            result = result.filter(o =>
+                o.customerName.toLowerCase().includes(query) ||
+                o.clothType.toLowerCase().includes(query) ||
+                o.status.toLowerCase().includes(query)
+            );
+        }
+
+        return result;
+    }, [orders, globalSearchQuery, statusFilter, deliveryFilter]);
 
     const globalFilteredCustomers = useMemo(() => {
         if (!globalSearchQuery) return customers;
@@ -241,9 +286,28 @@ export default function Dashboard() {
     const totalCustomers = useMemo(() => customers.length, [customers]);
     const activeOrdersCount = useMemo(() => orders.filter(o => o.status !== 'Completed').length, [orders]);
     const urgentOrdersCount = useMemo(() => orders.filter(o => o.isUrgent && o.status !== 'Completed').length, [orders]);
-    const completedToday = useMemo(() => orders.filter(o => o.status === 'Completed').length, [orders]);
+    const completedToday = useMemo(() => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        return orders.filter(o => o.status === 'Completed' && (o.orderDate?.split('T')[0] === todayStr)).length;
+    }, [orders]);
+
+    const dailyEarnings = useMemo(() => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        return orders.reduce((acc, order) => {
+            const orderPayments = (order.payments || []).filter(p => p.date.split('T')[0] === todayStr);
+            const todayPayments = orderPayments.reduce((sum, p) => sum + p.amount, 0);
+            // Also count advance paid today if order was created today
+            const advanceToday = (order.orderDate?.split('T')[0] === todayStr) ? (order.advancePaid || 0) : 0;
+            return acc + todayPayments + advanceToday;
+        }, 0);
+    }, [orders]);
+
     const totalRevenue = useMemo(() => orders.reduce((acc, curr) => acc + curr.amount, 0), [orders]);
-    const overdueCount = useMemo(() => orders.filter(o => new Date(o.deliveryDate) < new Date() && o.status !== 'Completed').length, [orders]);
+    const overdueCount = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return orders.filter(o => new Date(o.deliveryDate) < today && o.status !== 'Completed').length;
+    }, [orders]);
 
     // -- Handlers --
     const handleSaveSettings = async (e: React.FormEvent) => {
@@ -310,9 +374,51 @@ export default function Dashboard() {
                 c.id === selectedCustomerId ? { ...c, ...editCustomerForm } : c
             ));
             setIsEditCustomerModalOpen(false);
+            alert("Customer profile updated successfully!");
         } catch (error) {
             console.error('Error updating customer:', error);
-            alert('Failed to update customer.');
+            alert('Failed to update customer profile.');
+        }
+    };
+
+    const handleRecordPayment = async (orderId: string) => {
+        if (!paymentAmount || isNaN(Number(paymentAmount))) return;
+
+        try {
+            const order = orders.find(o => o.id === orderId);
+            if (!order) return;
+
+            const amount = Number(paymentAmount);
+            const newPayment = {
+                date: new Date().toISOString(),
+                amount,
+                method: paymentMethod
+            };
+
+            const updatedPayments = [...(order.payments || []), newPayment];
+            const totalPaid = (order.advancePaid || 0) + updatedPayments.reduce((sum, p) => sum + p.amount, 0);
+            const paymentStatus = totalPaid >= order.amount ? 'Paid' : 'Partial';
+
+            const res = await fetch('/api/orders', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: orderId,
+                    payments: updatedPayments,
+                    paymentStatus
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to record payment');
+
+            setOrders(orders.map(o => o.id === orderId ? { ...o, payments: updatedPayments, paymentStatus } : o));
+            setSelectedOrderForDetails(prev => prev ? { ...prev, payments: updatedPayments, paymentStatus } : null);
+            setPaymentAmount('');
+            setIsRecordingPayment(false);
+            alert("Payment recorded successfully!");
+        } catch (error) {
+            console.error('Error recording payment:', error);
+            alert('Failed to record payment.');
         }
     };
 
@@ -321,24 +427,45 @@ export default function Dashboard() {
         try {
             const customer = customers.find(c => c.id === selectedCustomerId);
             if (!customer) return;
-            const updatedMeasurements = {
-                ...(customer.measurements || {}),
-                [editingMeasurementGarment]: {
-                    ...measurementForm,
-                    lastUpdated: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+
+            const now = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            let updatedMeasurements = { ...(customer.measurements || {}) };
+
+            if (editingMeasurementGarment === 'custom') {
+                const customItems = [...(updatedMeasurements.customItems || [])];
+                const newItem = {
+                    id: editingCustomGarmentId || Math.random().toString(36).substr(2, 9),
+                    name: customGarmentName || 'Custom Item',
+                    category: customCategory,
+                    measurements: { ...measurementForm },
+                    lastUpdated: now
+                };
+
+                if (editingCustomGarmentId) {
+                    const idx = customItems.findIndex(i => i.id === editingCustomGarmentId);
+                    if (idx !== -1) customItems[idx] = newItem;
+                    else customItems.push(newItem);
+                } else {
+                    customItems.push(newItem);
                 }
-            };
+                updatedMeasurements.customItems = customItems;
+            } else {
+                (updatedMeasurements as any)[editingMeasurementGarment] = {
+                    ...measurementForm,
+                    lastUpdated: now
+                };
+            }
 
             const historyEntry = {
                 date: new Date().toISOString(),
-                type: editingMeasurementGarment,
+                type: editingMeasurementGarment === 'custom' ? customGarmentName : editingMeasurementGarment,
                 measurements: { ...measurementForm }
             };
 
             const updatedHistory = [
                 historyEntry,
                 ...(customer.measurementHistory || [])
-            ].slice(0, 50); // Keep last 50 changes
+            ].slice(0, 50);
 
             const res = await fetch('/api/customers', {
                 method: 'PUT',
@@ -346,16 +473,18 @@ export default function Dashboard() {
                 body: JSON.stringify({
                     id: selectedCustomerId,
                     measurements: updatedMeasurements,
-                    measurementHistory: updatedHistory
+                    measurementHistory: updatedHistory as any
                 })
             });
 
             if (!res.ok) throw new Error('Failed to save measurements');
 
             setCustomers(prev => prev.map(c =>
-                c.id === selectedCustomerId ? { ...c, measurements: updatedMeasurements, measurementHistory: updatedHistory } : c
+                c.id === selectedCustomerId ? { ...c, measurements: updatedMeasurements, measurementHistory: updatedHistory as any } : c
             ));
             setEditingMeasurementGarment(null);
+            setEditingCustomGarmentId(null);
+            setCustomGarmentName('');
             setMeasurementForm({});
         } catch (error) {
             console.error('Error saving measurements:', error);
@@ -442,7 +571,18 @@ export default function Dashboard() {
                                     </TableCell>
                                     <TableCell className="px-6 py-4 text-gray-600 font-medium hidden sm:table-cell">{order.clothType}</TableCell>
                                     <TableCell className="px-6 py-4 text-gray-500 text-xs">{order.deliveryDate}</TableCell>
-                                    <TableCell className="px-6 py-4 font-bold text-gray-900 text-xs sm:text-sm">{currencySymbol}{order.amount.toFixed(2)}</TableCell>
+                                    <TableCell className="px-6 py-4">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-gray-900 text-xs sm:text-sm">{currencySymbol}{order.amount.toLocaleString()}</span>
+                                            {(() => {
+                                                const totalPaid = (order.advancePaid || 0) + (order.payments || []).reduce((sum, p) => sum + p.amount, 0);
+                                                const due = order.amount - totalPaid;
+                                                if (due <= 0) return <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-tighter">Fully Paid</span>;
+                                                if (totalPaid > 0) return <span className="text-[8px] font-bold text-blue-500 uppercase tracking-tighter">Partial (Due: ₹{due.toLocaleString()})</span>;
+                                                return <span className="text-[8px] font-bold text-red-400 uppercase tracking-tighter">Unpaid</span>;
+                                            })()}
+                                        </div>
+                                    </TableCell>
                                     <TableCell className="px-3 sm:px-6 py-4">
                                         <Badge variant="secondary" className={`${getStatusColor(order.status)} text-[9px] sm:text-[10px] uppercase tracking-wider`}>
                                             {order.status}
@@ -603,10 +743,15 @@ export default function Dashboard() {
                                 {/* Stats Grid */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
                                     {[
-                                        { label: 'Total Customers', val: totalCustomers.toLocaleString(), sub: '+12%', subText: 'from last month', subColor: 'text-emerald-500', iconType: 'users' },
+                                        { label: 'Total Orders', val: orders.length.toString(), sub: `+${orders.filter(o => o.orderDate?.split('T')[0] === new Date().toISOString().split('T')[0]).length}`, subText: 'new today', subColor: 'text-emerald-500 font-bold', iconType: 'orders' },
                                         { label: 'Active Orders', val: activeOrdersCount.toString(), sub: `! ${urgentOrdersCount} Urgent`, subText: 'pending', subColor: 'text-orange-500 font-bold', iconType: 'orders' },
-                                        { label: "Today's Deliveries", val: completedToday.toString(), sub: '🕒 3 Completed', subText: '', subColor: 'text-slate-500', iconType: 'delivery' },
-                                        { label: 'Total Revenue', val: `${currencySymbol}${totalRevenue.toLocaleString()}`, sub: `⚠ ${overdueCount} Overdue`, subText: 'payments', subColor: 'text-red-500 font-bold', iconType: 'money' },
+                                        {
+                                            label: "Today's Deliveries", val: completedToday.toString(), sub: '🕒 Pending', subText: orders.filter(o => {
+                                                const today = new Date().toISOString().split('T')[0];
+                                                return o.deliveryDate === today && o.status !== 'Completed';
+                                            }).length.toString(), subColor: 'text-slate-500', iconType: 'delivery'
+                                        },
+                                        { label: 'Daily Earnings', val: `${currencySymbol}${dailyEarnings.toLocaleString()}`, sub: `Total ${currencySymbol}${totalRevenue.toLocaleString()}`, subText: '', subColor: 'text-emerald-500 font-bold', iconType: 'money' },
                                     ].map((stat, idx) => (
                                         <Card key={idx} className="relative overflow-hidden group hover:shadow-md transition-shadow border-stone-100 flex flex-col h-full">
                                             <div className="absolute left-0 top-2 bottom-2 w-[3px] border-l-2 border-dashed border-red-400 opacity-60"></div>
@@ -634,7 +779,49 @@ export default function Dashboard() {
 
                         {/* View: Orders */}
                         {activeTab === 'orders' && (
-                            <OrdersTable data={filteredOrders} />
+                            <div className="space-y-6">
+                                <div className="flex flex-wrap items-center gap-4 bg-white p-4 rounded-xl border border-stone-100 shadow-sm">
+                                    <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Order Status</label>
+                                        <select
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value as any)}
+                                            className="w-full px-3 py-2 text-sm font-bold text-gray-900 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all select-none"
+                                        >
+                                            <option value="All">All Statuses</option>
+                                            <option value="Received">Received</option>
+                                            <option value="Cutting">Cutting</option>
+                                            <option value="Fitting">Fitting</option>
+                                            <option value="Processing">Processing</option>
+                                            <option value="Ready">Ready</option>
+                                            <option value="Completed">Completed</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Delivery Timeframe</label>
+                                        <select
+                                            value={deliveryFilter}
+                                            onChange={(e) => setDeliveryFilter(e.target.value as any)}
+                                            className="w-full px-3 py-2 text-sm font-bold text-gray-900 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+                                        >
+                                            <option value="All">Any Time</option>
+                                            <option value="Today">Due Today</option>
+                                            <option value="This Week">Due This Week</option>
+                                            <option value="Overdue">Overdue Orders</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex items-end h-full pt-6">
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() => { setStatusFilter('All'); setDeliveryFilter('All'); setGlobalSearchQuery(''); }}
+                                            className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-orange-500 transition-colors"
+                                        >
+                                            Reset Filters
+                                        </Button>
+                                    </div>
+                                </div>
+                                <OrdersTable data={filteredOrders} />
+                            </div>
                         )}
 
                         {/* View: Customers (Plug) */}
@@ -801,9 +988,30 @@ export default function Dashboard() {
                                                                 label: 'Kurta',
                                                                 fields: ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'],
                                                                 data: customer.measurements?.kurta
-                                                            }
-                                                        ].map(garment => (
-                                                            <Card key={garment.type} className="border-stone-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                                            },
+                                                            {
+                                                                type: 'suit',
+                                                                label: 'Suit / Coat',
+                                                                fields: ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck'],
+                                                                data: customer.measurements?.suit
+                                                            },
+                                                            {
+                                                                type: 'vest',
+                                                                label: 'Vest / Waistcoat',
+                                                                fields: ['length', 'chest', 'waist'],
+                                                                data: customer.measurements?.vest
+                                                            },
+                                                            ...(customer.measurements?.customItems || []).map(item => ({
+                                                                type: 'custom' as any,
+                                                                customId: item.id,
+                                                                label: item.name,
+                                                                fields: (item.category === 'bottom') ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] : ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'],
+                                                                data: item.measurements,
+                                                                category: item.category,
+                                                                lastUpdated: item.lastUpdated
+                                                            }))
+                                                        ].map((garment: any, idx) => (
+                                                            <Card key={garment.customId || garment.type} className="border-stone-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                                                                 <div className="px-4 py-3 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
                                                                     <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">{garment.label}</span>
                                                                     {garment.data ? (
@@ -814,23 +1022,25 @@ export default function Dashboard() {
                                                                 </div>
                                                                 <CardContent className="p-4">
                                                                     <div className="space-y-1.5 min-h-[160px]">
-                                                                        {garment.fields.map(field => (
+                                                                        {garment.fields.map((field: string) => (
                                                                             <div key={field} className="flex justify-between border-b border-stone-100/50 pb-1 last:border-none">
                                                                                 <span className="text-[10px] font-bold text-gray-400 capitalize">{field}</span>
-                                                                                <span className="text-xs font-black text-gray-700">{(garment.data as any)?.[field] || '—'}&quot;</span>
+                                                                                <span className="text-xs font-black text-gray-700">{garment.data?.[field] || '—'}&quot;</span>
                                                                             </div>
                                                                         ))}
                                                                     </div>
                                                                     <div className="mt-4 pt-3 border-t border-stone-100 flex justify-between items-center">
                                                                         <span className="text-[8px] font-bold text-gray-300 uppercase">
-                                                                            {garment.data?.lastUpdated ? `Updated: ${garment.data.lastUpdated}` : 'No updates'}
+                                                                            {garment.lastUpdated ? `Updated: ${garment.lastUpdated}` : garment.data?.lastUpdated ? `Updated: ${garment.data.lastUpdated}` : 'No updates'}
                                                                         </span>
                                                                         <Button
                                                                             variant="outline"
                                                                             size="sm"
                                                                             onClick={() => {
-                                                                                // This will trigger the edit modal/inline form
                                                                                 setEditingMeasurementGarment(garment.type as any);
+                                                                                setEditingCustomGarmentId(garment.customId || null);
+                                                                                setCustomGarmentName(garment.customId ? garment.label : '');
+                                                                                setCustomCategory(garment.category || 'top');
                                                                                 setMeasurementForm(garment.data || {});
                                                                             }}
                                                                             className="h-7 px-3 text-[10px] font-black uppercase tracking-widest border-stone-200 hover:bg-stone-50"
@@ -841,6 +1051,23 @@ export default function Dashboard() {
                                                                 </CardContent>
                                                             </Card>
                                                         ))}
+
+                                                        {/* Add Custom Button Card */}
+                                                        <Card
+                                                            onClick={() => {
+                                                                setEditingMeasurementGarment('custom');
+                                                                setEditingCustomGarmentId(null);
+                                                                setCustomGarmentName('');
+                                                                setCustomCategory('top');
+                                                                setMeasurementForm({});
+                                                            }}
+                                                            className="border-2 border-dashed border-stone-200 bg-stone-50/30 flex flex-col items-center justify-center min-h-[250px] cursor-pointer hover:bg-stone-50 hover:border-orange-200 transition-all group"
+                                                        >
+                                                            <div className="w-12 h-12 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-400 group-hover:text-orange-500 group-hover:border-orange-200 transition-all shadow-sm">
+                                                                <Plus className="w-6 h-6" />
+                                                            </div>
+                                                            <span className="mt-3 text-[10px] font-black text-stone-400 uppercase tracking-widest group-hover:text-orange-600">Add Custom Garment</span>
+                                                        </Card>
                                                     </div>
                                                 )}
 
@@ -908,7 +1135,7 @@ export default function Dashboard() {
                                                         </div>
                                                     );
                                                 })()}
-                                            </div>
+                                            </div >
                                         </>
                                     );
                                 })()}
@@ -1003,26 +1230,28 @@ export default function Dashboard() {
                         </div>
 
                     </div>
-                )}
-            </main>
+                )
+                }
+            </main >
 
             {/* New Customer Dialog */}
-            <NewCustomerForm
+            < NewCustomerForm
                 isOpen={isNewCustomerModalOpen}
                 onOpenChange={setIsNewCustomerModalOpen}
                 onCustomerCreated={handleCustomerCreated}
             />
 
             {/* New Order Dialog */}
-            <NewOrderForm
+            < NewOrderForm
                 isOpen={isNewOrderModalOpen}
                 onOpenChange={setIsNewOrderModalOpen}
                 onOrderCreated={handleOrderCreated}
                 customers={customers}
+                orders={orders}
             />
 
             {/* Order Details & Measurements Dialog */}
-            <Dialog open={!!selectedOrderForDetails} onOpenChange={(open) => !open && setSelectedOrderForDetails(null)}>
+            < Dialog open={!!selectedOrderForDetails} onOpenChange={(open) => !open && setSelectedOrderForDetails(null)}>
                 <DialogContent showCloseButton={false} className="sm:max-w-3xl bg-white p-0 overflow-hidden border-none shadow-2xl rounded-xl">
                     <DialogTitle className="sr-only">Order Details</DialogTitle>
                     <div className="flex flex-col max-h-[85vh]">
@@ -1054,99 +1283,171 @@ export default function Dashboard() {
 
                                 return (
                                     <div className="space-y-8">
-                                        {/* Order Info Panel */}
-                                        <div className="bg-white border-2 border-stone-100 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 group">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center border-2 border-orange-200/50 shadow-inner">
-                                                    <span className="text-xl font-black text-orange-600 uppercase">
-                                                        {selectedOrderForDetails.initial}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <h2 className="text-lg font-black text-gray-900 uppercase tracking-tight">{selectedOrderForDetails.customerName}</h2>
-                                                    <div className="flex flex-wrap gap-2 mt-1">
-                                                        <Badge variant="outline" className="text-[10px] font-bold text-gray-500 border-stone-200 bg-stone-50">{selectedOrderForDetails.clothType}</Badge>
-                                                        {selectedOrderForDetails.isUrgent && <Badge className="text-[10px] bg-gradient-to-r from-red-500 to-orange-500 text-white border-none font-bold uppercase shadow-sm">Express</Badge>}
+                                        {/* Order Info Panel - Enhanced */}
+                                        <div className="bg-white border-2 border-stone-100 rounded-2xl overflow-hidden shadow-sm flex flex-col group">
+                                            {/* Top Section: Customer & Profile */}
+                                            <div className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-stone-50/50 to-white border-b border-stone-100">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-16 h-16 rounded-2xl bg-[#131b2e] flex items-center justify-center border-2 border-white shadow-xl rotate-[-2deg] group-hover:rotate-0 transition-transform duration-500">
+                                                        <span className="text-2xl font-black text-white uppercase italic">
+                                                            {selectedOrderForDetails.initial}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight flex items-center gap-2 group/name">
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (customer) {
+                                                                        setActiveTab('customer_profile');
+                                                                        setSelectedCustomerId(customer.id);
+                                                                        setSelectedOrderForDetails(null);
+                                                                    }
+                                                                }}
+                                                                className="hover:text-orange-500 transition-colors text-left flex items-center gap-2"
+                                                                title="Go to Customer Profile"
+                                                            >
+                                                                {selectedOrderForDetails.customerName}
+                                                                <ArrowRightIcon />
+                                                            </button>
+                                                            {selectedOrderForDetails.isUrgent && (
+                                                                <span className="flex h-2 w-2 rounded-full bg-red-500 animate-ping"></span>
+                                                            )}
+                                                        </h2>
+                                                        <div className="flex flex-wrap gap-2 mt-1.5 focus-within:ring-2">
+                                                            <Badge variant="outline" className="text-[10px] font-bold text-slate-500 border-stone-200 bg-white">
+                                                                {selectedOrderForDetails.clothType}
+                                                            </Badge>
+                                                            {selectedOrderForDetails.isUrgent && (
+                                                                <Badge className="text-[10px] bg-red-500 text-white border-none font-bold uppercase tracking-widest px-2">
+                                                                    Priority
+                                                                </Badge>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div className="text-left sm:text-right w-full sm:w-auto p-4 sm:p-0 bg-stone-50 sm:bg-transparent rounded-xl border sm:border-none border-stone-100">
-                                                <div className="flex justify-between sm:block">
-                                                    <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest sm:block mb-1">Total Valuation</span>
-                                                    <span className="text-xl sm:text-2xl font-black text-[#131b2e]">₹{selectedOrderForDetails.amount.toLocaleString()}</span>
+                                                <div className="text-left sm:text-right w-full sm:w-auto">
+                                                    <span className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] block mb-1">Order Valuation</span>
+                                                    <span className="text-3xl font-black text-[#131b2e] tabular-nums">₹{selectedOrderForDetails.amount.toLocaleString()}</span>
                                                 </div>
-                                                <div className="flex justify-between sm:block items-center mt-3 sm:mt-2">
-                                                    <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest sm:hidden">Delivery Date</span>
-                                                    <span className="text-xs font-bold text-orange-600 uppercase tracking-widest bg-orange-50 px-2.5 py-1 rounded-sm border border-orange-100">Due: {selectedOrderForDetails.deliveryDate}</span>
+                                            </div>
+
+                                            {/* Details Grid */}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 border-b border-stone-100 divide-x divide-stone-100">
+                                                <div className="p-4 bg-white/50">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                                        <Calendar className="w-3 h-3 text-orange-400" />
+                                                        Order Date
+                                                    </p>
+                                                    <p className="text-xs font-bold text-gray-900">{selectedOrderForDetails.orderDate ? new Date(selectedOrderForDetails.orderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</p>
+                                                </div>
+                                                <div className="p-4 bg-white/50">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                                        <Truck className="w-3 h-3 text-orange-500" />
+                                                        Delivery
+                                                    </p>
+                                                    <p className="text-xs font-bold text-orange-600 uppercase italic">{selectedOrderForDetails.deliveryDate}</p>
+                                                </div>
+                                                <div className="p-4 bg-white/50">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                                        <ShoppingCart className="w-3 h-3 text-amber-500" />
+                                                        Quantity
+                                                    </p>
+                                                    <p className="text-xs font-bold text-gray-900">
+                                                        {selectedOrderForDetails.quantity || 1} {(selectedOrderForDetails.quantity || 1) > 1 ? 'Pieces' : 'Piece'}
+                                                    </p>
+                                                </div>
+                                                <div className="p-4 bg-white/50">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                                                        <Package className="w-3 h-3 text-slate-400" />
+                                                        Cloth Source
+                                                    </p>
+                                                    <p className="text-xs font-bold text-gray-900">{selectedOrderForDetails.clothSource || 'Customer'}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Status Bar */}
+                                            <div className="px-6 py-3 bg-stone-50 flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Job Status</span>
+                                                    <Badge className={`${getStatusColor(selectedOrderForDetails.status)} text-[10px] font-bold uppercase tracking-widest px-3 py-0.5 border-none shadow-sm`}>
+                                                        {selectedOrderForDetails.status}
+                                                    </Badge>
+                                                </div>
+                                                <div className="hidden sm:flex items-center gap-4">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">ID: #{selectedOrderForDetails.id.substring(0, 8)}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Customer Measurments */}
                                         {customer && (
-                                            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300 border-t border-slate-100 pt-8">
                                                 <div className="flex items-center justify-between border-b border-stone-100 pb-2">
                                                     <h3 className="text-xs font-black text-[#131b2e] uppercase tracking-widest flex items-center gap-2">
                                                         <Scissors className="w-4 h-4 text-orange-500" />
                                                         Client Measurements
                                                     </h3>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{customer.phone}</span>
+                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{customer.phone}</span>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                                                    {/* We'll try to show all standard garment measurements, highlighting ordered ones */}
-                                                    {(['shirt', 'pant', 'kurta'] as const).map((type) => {
+                                                    {(['shirt', 'pant', 'kurta', 'suit', 'vest'] as const).map((type) => {
                                                         const data = customer.measurements?.[type] as any;
                                                         const isOrdered = garments.includes(type);
-                                                        if (!isOrdered && !data) return null; // Only show if they ordered it OR if it exists
+                                                        if (!isOrdered && !data) return null;
 
                                                         const fields = type === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
                                                             type === 'pant' ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] :
-                                                                ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'];
+                                                                type === 'kurta' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] :
+                                                                    type === 'suit' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck'] :
+                                                                        type === 'vest' ? ['length', 'chest', 'waist'] : [];
 
                                                         return (
-                                                            <div key={type} className={`
-                                                                relative bg-white border-2 rounded-2xl overflow-hidden shadow-sm transition-all duration-300
-                                                                ${isOrdered ? 'border-[#131b2e]' : 'border-stone-100 opacity-80'}
-                                                            `}>
-                                                                {isOrdered && <div className="absolute top-0 right-0 right-1 top-1 w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)] animate-pulse"></div>}
+                                                            <div key={type} className={`relative bg-white border-2 rounded-2xl overflow-hidden shadow-sm transition-all duration-300 ${isOrdered ? 'border-[#131b2e]' : 'border-stone-100 opacity-80'}`}>
                                                                 <div className={`px-4 py-3 border-b flex justify-between items-center ${isOrdered ? 'bg-slate-50 border-stone-200' : 'bg-stone-50 border-stone-100'}`}>
-                                                                    <span className={`text-[11px] font-black uppercase tracking-widest ${isOrdered ? 'text-[#131b2e]' : 'text-stone-400'}`}>{type}</span>
-                                                                    {!data && <span className="text-[9px] font-bold text-red-500 uppercase px-1.5 py-0.5 rounded bg-red-50">Pending</span>}
+                                                                    <span className={`text-[11px] font-black uppercase tracking-widest ${isOrdered ? 'text-[#131b2e]' : 'text-slate-500'}`}>{type}</span>
+                                                                    {data && (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setEditingMeasurementGarment(type as any);
+                                                                                setMeasurementForm(data || {});
+                                                                                setSelectedCustomerId(customer.id);
+                                                                            }}
+                                                                            className="text-[9px] font-black text-orange-500 uppercase hover:text-orange-600 transition-colors"
+                                                                        >
+                                                                            Edit
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                                 <div className="p-4 bg-white">
                                                                     {data ? (
                                                                         <div className="space-y-1.5 h-auto min-h-[140px]">
-                                                                            {fields.map((field, i) => (
+                                                                            {fields.map((field) => (
                                                                                 <div key={field} className="flex justify-between border-b border-stone-100 pb-1.5 last:border-none focus-within:bg-orange-50 transition-colors rounded px-1 -mx-1">
-                                                                                    <span className="text-[10px] font-bold text-slate-400 capitalize">{field}</span>
+                                                                                    <span className="text-[10px] font-bold text-slate-500 capitalize">{field}</span>
                                                                                     <span className="text-xs font-black text-slate-800">{data[field] || '—'}&quot;</span>
                                                                                 </div>
                                                                             ))}
                                                                         </div>
                                                                     ) : (
-                                                                        <div className="h-[140px] flex items-center justify-center text-center">
+                                                                        <div className="h-[140px] flex flex-col items-center justify-center text-center space-y-3">
                                                                             <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest leading-relaxed">Required<br />Needs Update</span>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                onClick={() => {
+                                                                                    setEditingMeasurementGarment(type as any);
+                                                                                    setMeasurementForm({});
+                                                                                    setSelectedCustomerId(customer.id);
+                                                                                }}
+                                                                                className="h-7 text-[9px] font-black uppercase tracking-widest bg-[#131b2e] hover:bg-black text-white px-4 rounded-lg shadow-sm"
+                                                                            >
+                                                                                Add Measurements
+                                                                            </Button>
                                                                         </div>
                                                                     )}
-                                                                    <div className="mt-3 pt-3 flex justify-between items-center text-[9px] font-bold text-slate-400 border-t border-stone-100">
-                                                                        <div className="uppercase tracking-widest flex flex-col">
-                                                                            <span>Updated</span>
-                                                                            <span>{data?.lastUpdated || 'Never'}</span>
-                                                                        </div>
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            onClick={() => {
-                                                                                setSelectedCustomerId(customer.id);
-                                                                                setEditingMeasurementGarment(type);
-                                                                                setMeasurementForm(data || {});
-                                                                            }}
-                                                                            className="h-7 px-3 text-[9px] font-black uppercase tracking-widest border-stone-200 hover:bg-stone-50"
-                                                                        >
-                                                                            Edit
-                                                                        </Button>
-                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         );
@@ -1155,21 +1456,131 @@ export default function Dashboard() {
                                             </div>
                                         )}
 
-                                        {!customer && (
-                                            <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl text-center">
-                                                <p className="text-xs font-bold text-orange-600 uppercase tracking-widest">Customer profile not found for measurement sync</p>
+                                        {/* Payment Tracking Panel */}
+                                        <div className="space-y-4 pt-8 border-t border-slate-100">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-xs font-black text-[#131b2e] uppercase tracking-widest flex items-center gap-2">
+                                                    <CreditCard className="w-4 h-4 text-emerald-500" />
+                                                    Payment Tracking
+                                                </h3>
+                                                <div className="flex gap-2">
+                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-tighter ${(selectedOrderForDetails.paymentStatus === 'Paid') ? 'text-emerald-700 bg-emerald-50' :
+                                                        (selectedOrderForDetails.paymentStatus === 'Partial') ? 'text-blue-700 bg-blue-50' : 'text-slate-500 bg-slate-50'
+                                                        }`}>
+                                                        Status: {selectedOrderForDetails.paymentStatus || 'Unpaid'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        )}
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
+                                                <div className="space-y-4">
+                                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Total Amount</span>
+                                                            <span className="text-lg font-black text-slate-900">₹{selectedOrderForDetails.amount.toLocaleString()}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Remaining Due</span>
+                                                            {(() => {
+                                                                const totalPaid = (selectedOrderForDetails.advancePaid || 0) + (selectedOrderForDetails.payments || []).reduce((sum, p) => sum + p.amount, 0);
+                                                                const due = selectedOrderForDetails.amount - totalPaid;
+                                                                return (
+                                                                    <span className={`text-lg font-black ${due > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                                                        ₹{Math.max(0, due).toLocaleString()}
+                                                                    </span>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Payment History</span>
+                                                        <div className="max-h-[150px] overflow-y-auto space-y-1.5 pr-2 custom-scrollbar">
+                                                            <div className="flex justify-between items-center py-2 px-3 bg-white border border-stone-100 rounded-lg">
+                                                                <div>
+                                                                    <p className="text-[10px] font-black text-slate-700 uppercase">Advance Payment</p>
+                                                                    <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Initial Deposit</p>
+                                                                </div>
+                                                                <span className="text-xs font-black text-slate-600">₹{selectedOrderForDetails.advancePaid?.toLocaleString()}</span>
+                                                            </div>
+                                                            {(selectedOrderForDetails.payments || []).map((p, i) => (
+                                                                <div key={i} className="flex justify-between items-center py-2 px-3 bg-white border border-stone-100 rounded-lg">
+                                                                    <div>
+                                                                        <p className="text-[10px] font-black text-slate-700 uppercase">Collection ({p.method})</p>
+                                                                        <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{new Date(p.date).toLocaleDateString()}</p>
+                                                                    </div>
+                                                                    <span className="text-xs font-black text-slate-600">₹{p.amount.toLocaleString()}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-stone-50/50 rounded-2xl p-5 border-2 border-dashed border-stone-200 flex flex-col justify-center min-h-[180px]">
+                                                    {!isRecordingPayment ? (
+                                                        <div className="text-center space-y-3">
+                                                            <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center mx-auto">
+                                                                <Plus className="w-4 h-4 text-orange-500" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <p className="text-xs font-black text-[#131b2e] uppercase tracking-wider">Record Collection</p>
+                                                                <p className="text-[9px] font-medium text-gray-500">Collect partial or full balance</p>
+                                                            </div>
+                                                            <Button
+                                                                onClick={() => setIsRecordingPayment(true)}
+                                                                disabled={selectedOrderForDetails.paymentStatus === 'Paid'}
+                                                                className="w-full bg-[#131b2e] hover:bg-[#1c2a5e] text-white text-[10px] font-black uppercase tracking-widest py-4 rounded-xl shadow-lg shadow-[#131b2e]/10"
+                                                            >
+                                                                {selectedOrderForDetails.paymentStatus === 'Paid' ? 'Paid in Full' : 'Collect Payment'}
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">New Collection</span>
+                                                                <button onClick={() => setIsRecordingPayment(false)} className="text-[10px] font-bold text-red-500 uppercase">Cancel</button>
+                                                            </div>
+                                                            <input
+                                                                autoFocus
+                                                                type="number"
+                                                                placeholder="Amount"
+                                                                value={paymentAmount}
+                                                                onChange={e => setPaymentAmount(e.target.value)}
+                                                                className="w-full px-4 py-3 text-sm font-black text-[#131b2e] bg-white border-2 border-stone-100 rounded-xl outline-none focus:border-orange-500"
+                                                            />
+                                                            <div className="flex gap-2">
+                                                                {(['Cash', 'Online', 'Card'] as const).map(m => (
+                                                                    <button
+                                                                        key={m}
+                                                                        onClick={() => setPaymentMethod(m)}
+                                                                        className={`flex-1 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg border-2 transition-all ${paymentMethod === m ? 'bg-[#131b2e] text-white border-[#131b2e]' : 'bg-white text-slate-500 border-stone-100'
+                                                                            }`}
+                                                                    >
+                                                                        {m}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            <Button
+                                                                onClick={() => handleRecordPayment(selectedOrderForDetails.id)}
+                                                                className="w-full bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-black uppercase tracking-widest py-4 rounded-xl"
+                                                            >
+                                                                Confirm Collection
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 );
                             })()}
                         </div>
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* Edit Customer Dialog */}
-            <Dialog open={isEditCustomerModalOpen} onOpenChange={setIsEditCustomerModalOpen}>
+            < Dialog open={isEditCustomerModalOpen} onOpenChange={setIsEditCustomerModalOpen} >
                 <DialogContent showCloseButton={true} className="sm:max-w-md bg-white border border-stone-200 p-0 overflow-hidden shadow-2xl rounded-xl">
                     <DialogHeader className="px-5 py-4 border-b border-stone-100 bg-stone-50/50">
                         <DialogTitle className="text-sm font-black text-gray-900 uppercase tracking-wider">
@@ -1226,36 +1637,71 @@ export default function Dashboard() {
                         </div>
                     </form>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* Measurement Edit Dialog */}
-            <Dialog open={!!editingMeasurementGarment} onOpenChange={(open) => { if (!open) { setEditingMeasurementGarment(null); setMeasurementForm({}); } }}>
+            <Dialog open={!!editingMeasurementGarment} onOpenChange={(open) => { if (!open) { setEditingMeasurementGarment(null); setEditingCustomGarmentId(null); setCustomGarmentName(''); setMeasurementForm({}); } }}>
                 <DialogContent className="sm:max-w-sm bg-white border border-stone-200 shadow-xl rounded-lg p-0 overflow-hidden">
                     <DialogHeader className="px-5 py-3 border-b border-stone-100 bg-stone-50/50">
                         <DialogTitle className="text-sm font-black text-gray-900 uppercase tracking-wider">
-                            {editingMeasurementGarment?.charAt(0).toUpperCase()}{editingMeasurementGarment?.slice(1)} Measurements
+                            {editingMeasurementGarment === 'custom'
+                                ? (customGarmentName || 'New Custom Garment')
+                                : `${editingMeasurementGarment?.charAt(0).toUpperCase()}${editingMeasurementGarment?.slice(1)}`} Measurements
                         </DialogTitle>
                     </DialogHeader>
-                    <div className="px-5 py-4 space-y-2">
-                        {(editingMeasurementGarment === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
-                            editingMeasurementGarment === 'pant' ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] :
-                                editingMeasurementGarment === 'kurta' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] : []
-                        ).map(field => (
-                            <div key={field} className="flex items-center justify-between border-b border-stone-100 pb-2 last:border-none">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase w-24 capitalize">{field}</label>
-                                <div className="flex items-center gap-1">
+                    <div className="px-5 py-4 space-y-4">
+                        {editingMeasurementGarment === 'custom' && (
+                            <div className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Garment Name</label>
                                     <input
-                                        type="number"
-                                        step="0.5"
-                                        value={measurementForm[field] || ''}
-                                        onChange={e => setMeasurementForm((prev: any) => ({ ...prev, [field]: e.target.value }))}
-                                        placeholder="0"
-                                        className="w-16 text-right text-xs font-black text-gray-900 bg-stone-50 border border-stone-200 rounded px-2 py-1 outline-none focus:border-gray-400"
+                                        type="text"
+                                        value={customGarmentName}
+                                        onChange={e => setCustomGarmentName(e.target.value)}
+                                        placeholder="e.g. Sherwani, Safari"
+                                        className="w-full px-3 py-2 text-sm font-bold text-gray-900 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:bg-white focus:border-orange-400 transition-colors"
                                     />
-                                    <span className="text-[10px] font-bold text-gray-400">&quot;</span>
+                                </div>
+                                <div className="flex bg-stone-100 p-1 rounded-xl">
+                                    <button
+                                        onClick={() => setCustomCategory('top')}
+                                        className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${customCategory === 'top' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}
+                                    >
+                                        Upper Body
+                                    </button>
+                                    <button
+                                        onClick={() => setCustomCategory('bottom')}
+                                        className={`flex-1 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${customCategory === 'bottom' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}
+                                    >
+                                        Lower Body
+                                    </button>
                                 </div>
                             </div>
-                        ))}
+                        )}
+                        <div className="space-y-2">
+                            {(editingMeasurementGarment === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
+                                editingMeasurementGarment === 'pant' ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] :
+                                    editingMeasurementGarment === 'kurta' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] :
+                                        editingMeasurementGarment === 'suit' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck'] :
+                                            editingMeasurementGarment === 'vest' ? ['length', 'chest', 'waist'] :
+                                                editingMeasurementGarment === 'custom' ? (customCategory === 'top' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] : ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom']) : []
+                            ).map(field => (
+                                <div key={field} className="flex items-center justify-between border-b border-stone-100 pb-2 last:border-none">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase w-24 capitalize">{field}</label>
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="number"
+                                            step="0.5"
+                                            value={measurementForm[field] || ''}
+                                            onChange={e => setMeasurementForm((prev: any) => ({ ...prev, [field]: e.target.value }))}
+                                            placeholder="0"
+                                            className="w-16 text-right text-xs font-black text-gray-900 bg-stone-50 border border-stone-200 rounded px-2 py-1 outline-none focus:border-gray-400"
+                                        />
+                                        <span className="text-[10px] font-bold text-gray-400">&quot;</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 border-t border-stone-100">
                         <button type="button"
