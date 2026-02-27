@@ -22,6 +22,7 @@ import {
     Plus,
     X,
     Scissors,
+    Trash2,
     History,
     Copy,
     ArrowUpRight
@@ -71,6 +72,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
     const [focusedSuggestionIndex, setFocusedSuggestionIndex] = useState(-1);
     const [isSaving, setIsSaving] = useState(false);
     const [customCategory, setCustomCategory] = useState<'top' | 'bottom'>('top');
+    const [isAddingExtraField, setIsAddingExtraField] = useState(false);
+    const [newFieldName, setNewFieldName] = useState('');
 
     // Reset when closed
     useEffect(() => {
@@ -871,7 +874,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                 const type = editingMeasurementsType?.toLowerCase();
                                 const isCustom = type === 'custom';
 
-                                const fields = type === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
+                                const baseFields = type === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
                                     type === 'pant' ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] :
                                         type === 'kurta' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] :
                                             type === 'suit' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck'] :
@@ -879,6 +882,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                     isCustom ? (customCategory === 'top' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] : ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom']) : [];
 
                                 const currentMeasures = (newOrderForm.measurements as any)?.[type as any] || {};
+                                const extraFields = Object.keys(currentMeasures).filter(k => k !== 'lastUpdated' && !baseFields.includes(k));
+                                const allFields = [...baseFields, ...extraFields];
 
                                 return (
                                     <div className="space-y-6 w-full">
@@ -899,10 +904,10 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                             </div>
                                         )}
                                         <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                                            {fields.map(field => (
+                                            {allFields.map(field => (
                                                 <div key={field} className="flex items-center justify-between border-b border-stone-50 pb-2">
                                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest capitalize">{field}</label>
-                                                    <div className="flex items-center gap-1">
+                                                    <div className="flex items-center gap-1 group">
                                                         <input
                                                             type="number"
                                                             step="0.125"
@@ -923,9 +928,82 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                             className="w-14 h-8 text-right text-xs font-black text-[#131b2e] bg-slate-50 border border-stone-200 rounded px-2 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
                                                         />
                                                         <span className="text-[10px] font-bold text-slate-400">&quot;</span>
+                                                        {extraFields.includes(field) && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    const newMeasures = { ...currentMeasures };
+                                                                    delete newMeasures[field];
+                                                                    setNewOrderForm(prev => ({
+                                                                        ...prev,
+                                                                        measurements: {
+                                                                            ...prev.measurements,
+                                                                            [type!]: newMeasures
+                                                                        }
+                                                                    }));
+                                                                }}
+                                                                className="p-1 text-gray-300 hover:text-red-500"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
+                                        </div>
+
+                                        {/* Add Extra Point UI */}
+                                        <div className="pt-2">
+                                            {isAddingExtraField ? (
+                                                <div className="flex gap-2 animate-in fade-in slide-in-from-top-1">
+                                                    <input
+                                                        autoFocus
+                                                        type="text"
+                                                        placeholder="e.g. Cuff"
+                                                        value={newFieldName}
+                                                        onChange={e => setNewFieldName(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' && newFieldName.trim()) {
+                                                                const field = newFieldName.trim().toLowerCase();
+                                                                setNewOrderForm(prev => ({
+                                                                    ...prev,
+                                                                    measurements: {
+                                                                        ...prev.measurements,
+                                                                        [type!]: { ...((prev.measurements?.[type as any] as any) || {}), [field]: '' }
+                                                                    }
+                                                                }));
+                                                                setNewFieldName('');
+                                                                setIsAddingExtraField(false);
+                                                            }
+                                                        }}
+                                                        className="flex-1 px-3 py-1.5 text-xs font-bold border rounded outline-none"
+                                                    />
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            if (newFieldName.trim()) {
+                                                                const field = newFieldName.trim().toLowerCase();
+                                                                setNewOrderForm(prev => ({
+                                                                    ...prev,
+                                                                    measurements: {
+                                                                        ...prev.measurements,
+                                                                        [type!]: { ...((prev.measurements?.[type as any] as any) || {}), [field]: '' }
+                                                                    }
+                                                                }));
+                                                                setNewFieldName('');
+                                                                setIsAddingExtraField(false);
+                                                            }
+                                                        }}
+                                                        className="h-8 bg-[#131b2e] text-white text-[10px]"
+                                                    >Add</Button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setIsAddingExtraField(true)}
+                                                    className="w-full py-2 border border-dashed rounded text-[9px] font-black uppercase text-slate-400 flex items-center justify-center gap-1.5 hover:text-[#131b2e] hover:border-[#131b2e] transition-all"
+                                                >
+                                                    <Plus className="w-3 h-3" /> Add Extra Point
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 );

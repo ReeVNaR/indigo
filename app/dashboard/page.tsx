@@ -15,6 +15,7 @@ import {
     Truck,
     IndianRupee,
     Plus,
+    X,
     MoreVertical,
     Trash2,
     Loader2,
@@ -158,7 +159,7 @@ export default function Dashboard() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState('dashboard');
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-    const [activeProfileTab, setActiveProfileTab] = useState<'measures' | 'history'>('measures');
+    const [activeProfileTab, setActiveProfileTab] = useState<'measures' | 'history' | 'report'>('measures');
     const [editingMeasurementGarment, setEditingMeasurementGarment] = useState<'shirt' | 'pant' | 'kurta' | 'suit' | 'vest' | 'custom' | null>(null);
     const [editingCustomGarmentId, setEditingCustomGarmentId] = useState<string | null>(null);
     const [customGarmentName, setCustomGarmentName] = useState<string>('');
@@ -178,6 +179,8 @@ export default function Dashboard() {
     const [statusFilter, setStatusFilter] = useState<OrderStatus | 'All'>('All');
     const [deliveryFilter, setDeliveryFilter] = useState<'All' | 'Today' | 'This Week' | 'Overdue'>('All');
     const [isRecordingPayment, setIsRecordingPayment] = useState(false);
+    const [isAddingExtraField, setIsAddingExtraField] = useState(false);
+    const [newFieldName, setNewFieldName] = useState('');
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online' | 'Card'>('Cash');
 
@@ -965,6 +968,16 @@ export default function Dashboard() {
                                                             )}
                                                         </button>
                                                     ))}
+                                                    {/* Report Tab */}
+                                                    <button
+                                                        onClick={() => setActiveProfileTab('report')}
+                                                        className={`pb-3 text-[10px] font-black uppercase tracking-widest transition-colors relative ${activeProfileTab === 'report' ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                    >
+                                                        Customer Report
+                                                        {activeProfileTab === 'report' && (
+                                                            <div className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-orange-500"></div>
+                                                        )}
+                                                    </button>
                                                 </div>
 
                                                 {activeProfileTab === 'measures' && (
@@ -1135,6 +1148,146 @@ export default function Dashboard() {
                                                         </div>
                                                     );
                                                 })()}
+
+                                                {activeProfileTab === 'report' && (() => {
+                                                    const customerOrders = orders.filter(o => o.customerName === customer.name);
+                                                    const totalSpent = customerOrders.reduce((s, o) => s + o.amount, 0);
+                                                    const totalPaid = customerOrders.reduce((s, o) => {
+                                                        const paid = (o.advancePaid || 0) + (o.payments || []).reduce((ps: number, p: any) => ps + p.amount, 0);
+                                                        return s + paid;
+                                                    }, 0);
+                                                    const totalDue = totalSpent - totalPaid;
+                                                    const completedOrders = customerOrders.filter(o => o.status === 'Completed');
+                                                    const activeOrders = customerOrders.filter(o => o.status !== 'Completed');
+                                                    const today = new Date();
+                                                    const overdueOrders = customerOrders.filter(o => o.status !== 'Completed' && new Date(o.deliveryDate) < today);
+                                                    const garmentTypes = [...new Set(customerOrders.flatMap(o => o.clothType.split(', ').map(s => s.trim())))];
+                                                    const hasMeasurements = ['shirt', 'pant', 'kurta', 'suit', 'vest'].filter(g => (customer.measurements as any)?.[g]);
+                                                    const firstOrder = customerOrders.slice().sort((a, b) => new Date(a.orderDate || '').getTime() - new Date(b.orderDate || '').getTime())[0];
+                                                    const lastOrder = customerOrders.slice().sort((a, b) => new Date(b.orderDate || '').getTime() - new Date(a.orderDate || '').getTime())[0];
+
+                                                    return (
+                                                        <div className="space-y-6">
+
+                                                            {/* Stats Row */}
+                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                                {[
+                                                                    { label: 'Total Orders', value: customerOrders.length, sub: `${completedOrders.length} completed`, color: 'bg-stone-50 border-stone-200' },
+                                                                    { label: 'Total Billed', value: `₹${totalSpent.toLocaleString()}`, sub: `₹${totalPaid.toLocaleString()} received`, color: 'bg-emerald-50/50 border-emerald-100' },
+                                                                    { label: 'Amount Due', value: `₹${totalDue.toLocaleString()}`, sub: totalDue > 0 ? 'Outstanding balance' : 'Fully settled', color: totalDue > 0 ? 'bg-red-50/50 border-red-100' : 'bg-emerald-50/50 border-emerald-100' },
+                                                                    { label: 'Active Orders', value: activeOrders.length, sub: overdueOrders.length > 0 ? `${overdueOrders.length} overdue` : 'All on track', color: overdueOrders.length > 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-stone-50 border-stone-200' },
+                                                                ].map((stat, i) => (
+                                                                    <div key={i} className={`${stat.color} border rounded-xl p-4`}>
+                                                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{stat.label}</p>
+                                                                        <p className="text-xl font-black text-gray-900">{stat.value}</p>
+                                                                        <p className="text-[9px] font-bold text-gray-400 mt-1">{stat.sub}</p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+
+                                                            {/* Contact & Info */}
+                                                            <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
+                                                                <div className="px-4 py-3 bg-stone-50 border-b border-stone-100">
+                                                                    <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Contact Information</span>
+                                                                </div>
+                                                                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                    {[
+                                                                        { label: 'Full Name', value: customer.name },
+                                                                        { label: 'Phone', value: customer.phone || '—' },
+                                                                        { label: 'Email', value: customer.email || '—' },
+                                                                        { label: 'Address', value: customer.address || '—' },
+                                                                        { label: 'First Order', value: firstOrder ? (firstOrder.orderDate || firstOrder.deliveryDate) : '—' },
+                                                                        { label: 'Last Order', value: lastOrder ? (lastOrder.orderDate || lastOrder.deliveryDate) : '—' },
+                                                                        { label: 'Garment Types Used', value: garmentTypes.length > 0 ? garmentTypes.join(', ') : '—' },
+                                                                        { label: 'Measurements Saved', value: hasMeasurements.length > 0 ? hasMeasurements.map(g => g.charAt(0).toUpperCase() + g.slice(1)).join(', ') : 'None' },
+                                                                    ].map((row, i) => (
+                                                                        <div key={i} className="flex flex-col gap-0.5">
+                                                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{row.label}</span>
+                                                                            <span className="text-xs font-bold text-gray-800">{row.value}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                    {customer.notes && (
+                                                                        <div className="md:col-span-2 flex flex-col gap-0.5">
+                                                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Notes</span>
+                                                                            <span className="text-xs font-medium text-amber-700 italic bg-amber-50 px-3 py-2 rounded border border-amber-100">{customer.notes}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Orders Table */}
+                                                            {customerOrders.length > 0 && (
+                                                                <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
+                                                                    <div className="px-4 py-3 bg-stone-50 border-b border-stone-100 flex items-center justify-between">
+                                                                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">All Orders</span>
+                                                                        <span className="text-[9px] font-bold text-gray-400">{customerOrders.length} orders</span>
+                                                                    </div>
+                                                                    <div className="divide-y divide-stone-50">
+                                                                        {customerOrders.map((o: Order) => {
+                                                                            const paid = (o.advancePaid || 0) + (o.payments || []).reduce((s: number, p: any) => s + p.amount, 0);
+                                                                            const due = o.amount - paid;
+                                                                            return (
+                                                                                <div key={o.id} className="px-4 py-3 flex items-center justify-between hover:bg-stone-50/50 transition-colors gap-4">
+                                                                                    <div className="min-w-0 flex-1">
+                                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                                            <span className="text-[10px] font-black text-gray-900 uppercase">{o.clothType}</span>
+                                                                                            {o.isUrgent && <span className="text-[8px] font-black text-red-500 bg-red-50 px-1.5 py-0.5 rounded uppercase">Urgent</span>}
+                                                                                        </div>
+                                                                                        <div className="flex items-center gap-3 mt-0.5">
+                                                                                            <span className="text-[9px] text-gray-400">{o.orderDate || '—'}</span>
+                                                                                            <span className="text-[9px] text-gray-400">→ {o.deliveryDate}</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="text-right shrink-0 space-y-0.5">
+                                                                                        <div className="text-xs font-black text-gray-900">₹{o.amount.toLocaleString()}</div>
+                                                                                        {due > 0 ? (
+                                                                                            <div className="text-[9px] font-bold text-red-500">Due: ₹{due.toLocaleString()}</div>
+                                                                                        ) : (
+                                                                                            <div className="text-[9px] font-bold text-emerald-500">Paid ✓</div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <span className={`text-[8px] font-black uppercase px-2 py-1 rounded border shrink-0 ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                                                        o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                                                                            'bg-amber-50 text-amber-600 border-amber-100'
+                                                                                        }`}>{o.status}</span>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Measurements Summary */}
+                                                            {hasMeasurements.length > 0 && (
+                                                                <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
+                                                                    <div className="px-4 py-3 bg-stone-50 border-b border-stone-100">
+                                                                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Saved Measurements</span>
+                                                                    </div>
+                                                                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                        {hasMeasurements.map(garment => {
+                                                                            const data = (customer.measurements as any)[garment];
+                                                                            return (
+                                                                                <div key={garment} className="border border-stone-100 rounded-lg p-3">
+                                                                                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2">{garment}</p>
+                                                                                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                                                                        {Object.entries(data).filter(([k]) => k !== 'lastUpdated').map(([key, val]) => (
+                                                                                            <span key={key} className="text-[10px] text-gray-600">
+                                                                                                <span className="capitalize text-gray-400">{key}: </span>
+                                                                                                <span className="font-black text-gray-800">{val as string}&quot;</span>
+                                                                                            </span>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                        </div>
+                                                    );
+                                                })()}
+
                                             </div >
                                         </>
                                     );
@@ -1649,9 +1802,9 @@ export default function Dashboard() {
                                 : `${editingMeasurementGarment?.charAt(0).toUpperCase()}${editingMeasurementGarment?.slice(1)}`} Measurements
                         </DialogTitle>
                     </DialogHeader>
-                    <div className="px-5 py-4 space-y-4">
+                    <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
                         {editingMeasurementGarment === 'custom' && (
-                            <div className="space-y-4">
+                            <div className="space-y-4 pb-4 border-b border-stone-100">
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Garment Name</label>
                                     <input
@@ -1679,33 +1832,96 @@ export default function Dashboard() {
                             </div>
                         )}
                         <div className="space-y-2">
-                            {(editingMeasurementGarment === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
-                                editingMeasurementGarment === 'pant' ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] :
-                                    editingMeasurementGarment === 'kurta' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] :
-                                        editingMeasurementGarment === 'suit' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck'] :
-                                            editingMeasurementGarment === 'vest' ? ['length', 'chest', 'waist'] :
-                                                editingMeasurementGarment === 'custom' ? (customCategory === 'top' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] : ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom']) : []
-                            ).map(field => (
-                                <div key={field} className="flex items-center justify-between border-b border-stone-100 pb-2 last:border-none">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase w-24 capitalize">{field}</label>
-                                    <div className="flex items-center gap-1">
-                                        <input
-                                            type="number"
-                                            step="0.5"
-                                            value={measurementForm[field] || ''}
-                                            onChange={e => setMeasurementForm((prev: any) => ({ ...prev, [field]: e.target.value }))}
-                                            placeholder="0"
-                                            className="w-16 text-right text-xs font-black text-gray-900 bg-stone-50 border border-stone-200 rounded px-2 py-1 outline-none focus:border-gray-400"
-                                        />
-                                        <span className="text-[10px] font-bold text-gray-400">&quot;</span>
+                            {(() => {
+                                const baseFields = (editingMeasurementGarment === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
+                                    editingMeasurementGarment === 'pant' ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] :
+                                        editingMeasurementGarment === 'kurta' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] :
+                                            editingMeasurementGarment === 'suit' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck'] :
+                                                editingMeasurementGarment === 'vest' ? ['length', 'chest', 'waist'] :
+                                                    editingMeasurementGarment === 'custom' ? (customCategory === 'top' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] : ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom']) : []);
+
+                                const extraFields = Object.keys(measurementForm).filter(k => k !== 'lastUpdated' && !baseFields.includes(k));
+                                const allFields = [...baseFields, ...extraFields];
+
+                                return allFields.map(field => (
+                                    <div key={field} className="flex items-center justify-between border-b border-stone-100 pb-2 last:border-none">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase w-32 capitalize">{field}</label>
+                                        <div className="flex items-center gap-2 group">
+                                            <input
+                                                type="number"
+                                                step="0.5"
+                                                value={measurementForm[field] || ''}
+                                                onChange={e => setMeasurementForm((prev: any) => ({ ...prev, [field]: e.target.value }))}
+                                                placeholder="0"
+                                                className="w-16 text-right text-xs font-black text-gray-900 bg-stone-50 border border-stone-200 rounded px-2 py-1 outline-none focus:border-gray-400"
+                                            />
+                                            <span className="text-[10px] font-bold text-gray-400">&quot;</span>
+                                            {extraFields.includes(field) && (
+                                                <button
+                                                    onClick={() => {
+                                                        const newForm = { ...measurementForm };
+                                                        delete newForm[field];
+                                                        setMeasurementForm(newForm);
+                                                    }}
+                                                    className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
+                                ));
+                            })()}
+                        </div>
+
+                        {/* Add Extra Field UI */}
+                        <div className="pt-2">
+                            {isAddingExtraField ? (
+                                <div className="flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        placeholder="Point name (e.g. Collar)"
+                                        value={newFieldName}
+                                        onChange={e => setNewFieldName(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' && newFieldName.trim()) {
+                                                setMeasurementForm((p: any) => ({ ...p, [newFieldName.trim().toLowerCase()]: '' }));
+                                                setNewFieldName('');
+                                                setIsAddingExtraField(false);
+                                            }
+                                        }}
+                                        className="flex-1 px-3 py-1.5 text-xs font-bold bg-stone-50 border border-stone-200 rounded outline-none focus:border-gray-400"
+                                    />
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            if (newFieldName.trim()) {
+                                                setMeasurementForm((p: any) => ({ ...p, [newFieldName.trim().toLowerCase()]: '' }));
+                                                setNewFieldName('');
+                                                setIsAddingExtraField(false);
+                                            }
+                                        }}
+                                        className="h-8 bg-gray-900 text-white text-[10px] font-black uppercase"
+                                    >Add</Button>
+                                    <button
+                                        onClick={() => { setIsAddingExtraField(false); setNewFieldName(''); }}
+                                        className="p-2 text-gray-400"
+                                    ><X className="w-4 h-4" /></button>
                                 </div>
-                            ))}
+                            ) : (
+                                <button
+                                    onClick={() => setIsAddingExtraField(true)}
+                                    className="w-full py-2 border border-dashed border-stone-200 rounded text-[9px] font-black text-gray-400 uppercase tracking-widest hover:border-gray-400 hover:text-gray-600 transition-all flex items-center justify-center gap-1.5"
+                                >
+                                    <Plus className="w-3 h-3" /> Add Extra Point
+                                </button>
+                            )}
                         </div>
                     </div>
                     <div className="grid grid-cols-2 border-t border-stone-100">
                         <button type="button"
-                            onClick={() => { setEditingMeasurementGarment(null); setMeasurementForm({}); }}
+                            onClick={() => { setEditingMeasurementGarment(null); setMeasurementForm({}); setIsAddingExtraField(false); setNewFieldName(''); }}
                             className="py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:bg-stone-50 transition-colors border-r border-stone-100"
                         >Cancel</button>
                         <button type="button"
