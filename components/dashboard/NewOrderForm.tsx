@@ -40,6 +40,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
         customerData: {
             name: '',
             phone: '',
+            address: '',
+            notes: '',
             category: 'Adult' as 'Adult' | 'Kid'
         },
         showInlineCustomerForm: false,
@@ -69,7 +71,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
             setShowCustomerSuggestions(false);
             setNewOrderForm({
                 customerId: null,
-                customerData: { name: '', phone: '', category: 'Adult' },
+                customerData: { name: '', phone: '', address: '', notes: '', category: 'Adult' },
                 showInlineCustomerForm: false,
                 items: [],
                 deliveryDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
@@ -104,7 +106,13 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
         setNewOrderForm(prev => ({
             ...prev,
             customerId: customer.id,
-            customerData: { name: customer.name, phone: customer.phone, category: 'Adult' },
+            customerData: {
+                name: customer.name,
+                phone: customer.phone,
+                address: customer.address || '',
+                notes: customer.notes || '',
+                category: 'Adult'
+            },
             showInlineCustomerForm: false
         }));
         setCustomerSearchQuery(customer.name);
@@ -159,6 +167,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                     body: JSON.stringify({
                         name: newOrderForm.customerData.name,
                         phone: newOrderForm.customerData.phone,
+                        address: newOrderForm.customerData.address,
+                        notes: newOrderForm.customerData.notes,
                         email: `${newOrderForm.customerData.name.toLowerCase().replace(/\s+/g, '.')}@example.com`,
                         ordersCount: 0,
                         totalSpent: 0,
@@ -260,6 +270,26 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                 onChange={e => setNewOrderForm(p => ({ ...p, customerData: { ...p.customerData, phone: e.target.value } }))}
                                 className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-[#131c3f] focus:border-amber-400 focus:bg-white outline-none transition-all"
                                 placeholder="Optional"
+                            />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Address</label>
+                            <input
+                                type="text"
+                                value={newOrderForm.customerData.address}
+                                onChange={e => setNewOrderForm(p => ({ ...p, customerData: { ...p.customerData, address: e.target.value } }))}
+                                className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-[#131c3f] focus:border-amber-400 focus:bg-white outline-none transition-all"
+                                placeholder="Enter address"
+                            />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Notes</label>
+                            <input
+                                type="text"
+                                value={newOrderForm.customerData.notes}
+                                onChange={e => setNewOrderForm(p => ({ ...p, customerData: { ...p.customerData, notes: e.target.value } }))}
+                                className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-lg text-sm font-bold text-[#131c3f] focus:border-amber-400 focus:bg-white outline-none transition-all"
+                                placeholder="Special instructions or notes"
                             />
                         </div>
                     </div>

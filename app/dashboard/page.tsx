@@ -169,7 +169,7 @@ export default function Dashboard() {
     const [globalSearchQuery, setGlobalSearchQuery] = useState('');
     const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
     const [isEditCustomerModalOpen, setIsEditCustomerModalOpen] = useState(false);
-    const [editCustomerForm, setEditCustomerForm] = useState({ name: '', phone: '', email: '' });
+    const [editCustomerForm, setEditCustomerForm] = useState({ name: '', phone: '', email: '', address: '', notes: '' });
 
     const [settingsForm, setSettingsForm] = useState({
         shopName: 'Dadashri Designers',
@@ -294,7 +294,14 @@ export default function Dashboard() {
             const res = await fetch('/api/customers', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: selectedCustomerId, name: editCustomerForm.name, phone: editCustomerForm.phone, email: editCustomerForm.email })
+                body: JSON.stringify({
+                    id: selectedCustomerId,
+                    name: editCustomerForm.name,
+                    phone: editCustomerForm.phone,
+                    email: editCustomerForm.email,
+                    address: editCustomerForm.address,
+                    notes: editCustomerForm.notes
+                })
             });
 
             if (!res.ok) throw new Error('Failed to update customer');
@@ -322,16 +329,31 @@ export default function Dashboard() {
                 }
             };
 
+            const historyEntry = {
+                date: new Date().toISOString(),
+                type: editingMeasurementGarment,
+                measurements: { ...measurementForm }
+            };
+
+            const updatedHistory = [
+                historyEntry,
+                ...(customer.measurementHistory || [])
+            ].slice(0, 50); // Keep last 50 changes
+
             const res = await fetch('/api/customers', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: selectedCustomerId, measurements: updatedMeasurements })
+                body: JSON.stringify({
+                    id: selectedCustomerId,
+                    measurements: updatedMeasurements,
+                    measurementHistory: updatedHistory
+                })
             });
 
             if (!res.ok) throw new Error('Failed to save measurements');
 
             setCustomers(prev => prev.map(c =>
-                c.id === selectedCustomerId ? { ...c, measurements: updatedMeasurements } : c
+                c.id === selectedCustomerId ? { ...c, measurements: updatedMeasurements, measurementHistory: updatedHistory } : c
             ));
             setEditingMeasurementGarment(null);
             setMeasurementForm({});
@@ -687,7 +709,13 @@ export default function Dashboard() {
                                                             <button
                                                                 title="Edit Customer Details"
                                                                 onClick={() => {
-                                                                    setEditCustomerForm({ name: customer.name, phone: customer.phone, email: customer.email });
+                                                                    setEditCustomerForm({
+                                                                        name: customer.name,
+                                                                        phone: customer.phone,
+                                                                        email: customer.email,
+                                                                        address: customer.address || '',
+                                                                        notes: customer.notes || ''
+                                                                    });
                                                                     setIsEditCustomerModalOpen(true);
                                                                 }}
                                                                 className="ml-2 w-7 h-7 rounded-md bg-stone-50 border border-stone-200 flex items-center justify-center text-stone-400 hover:text-orange-500 hover:border-orange-200 hover:bg-orange-50 transition-colors shadow-sm"
@@ -695,10 +723,23 @@ export default function Dashboard() {
                                                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                                             </button>
                                                         </div>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{customer.phone}</p>
-                                                            <span className="text-[10px] text-gray-300">|</span>
-                                                            <p className="text-[10px] font-bold text-gray-400">{customer.email}</p>
+                                                        <div className="flex flex-col gap-1 mt-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{customer.phone}</p>
+                                                                <span className="text-[10px] text-gray-300">|</span>
+                                                                <p className="text-[10px] font-bold text-gray-400">{customer.email}</p>
+                                                            </div>
+                                                            {customer.address && (
+                                                                <p className="text-[10px] font-medium text-gray-500 flex items-center gap-1">
+                                                                    <svg className="w-3 h-3 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                                                    {customer.address}
+                                                                </p>
+                                                            )}
+                                                            {customer.notes && (
+                                                                <div className="mt-1 p-2 bg-amber-50/50 rounded border border-amber-100/50 max-w-md">
+                                                                    <p className="text-[10px] italic text-amber-700 leading-relaxed"><span className="font-black not-italic text-[8px] uppercase tracking-tighter mr-1">Note:</span>{customer.notes}</p>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -805,33 +846,65 @@ export default function Dashboard() {
 
                                                 {activeProfileTab === 'history' && (() => {
                                                     const customerOrders = orders.filter(o => o.customerName === customer.name);
-                                                    return customerOrders.length === 0 ? (
-                                                        <div className="py-12 text-center text-gray-400 font-medium bg-stone-50 rounded-xl border border-dashed border-stone-200 text-sm">
-                                                            No orders found for this customer.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
-                                                            <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-stone-50 border-b border-stone-100">
-                                                                <div className="col-span-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Date</div>
-                                                                <div className="col-span-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Garment</div>
-                                                                <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">Delivery</div>
-                                                                <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Amount</div>
-                                                                <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Status</div>
-                                                            </div>
-                                                            {customerOrders.map(o => (
-                                                                <div key={o.id} className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-stone-50 last:border-none hover:bg-stone-50/50">
-                                                                    <div className="col-span-3 text-[10px] font-bold text-gray-400">{o.orderDate || '—'}</div>
-                                                                    <div className="col-span-3 text-[10px] font-black text-gray-700 uppercase">{o.clothType || '—'}</div>
-                                                                    <div className="col-span-2 text-[10px] font-bold text-gray-500">{o.deliveryDate}</div>
-                                                                    <div className="col-span-2 text-xs font-black text-gray-900 text-right">₹{o.amount.toLocaleString()}</div>
-                                                                    <div className="col-span-2 text-right">
-                                                                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                                                            o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
-                                                                                'bg-amber-50 text-amber-600 border border-amber-100'
-                                                                            }`}>{o.status}</span>
-                                                                    </div>
+                                                    return (
+                                                        <div className="space-y-6">
+                                                            {customerOrders.length === 0 ? (
+                                                                <div className="py-12 text-center text-gray-400 font-medium bg-stone-50 rounded-xl border border-dashed border-stone-200 text-sm">
+                                                                    No orders found for this customer.
                                                                 </div>
-                                                            ))}
+                                                            ) : (
+                                                                <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
+                                                                    <div className="px-4 py-3 bg-stone-50 border-b border-stone-100 flex items-center gap-2">
+                                                                        <ShoppingCart className="w-3.5 h-3.5 text-gray-400" />
+                                                                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Order History</span>
+                                                                    </div>
+                                                                    <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-stone-50/50 border-b border-stone-100">
+                                                                        <div className="col-span-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Date</div>
+                                                                        <div className="col-span-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Garment</div>
+                                                                        <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">Delivery</div>
+                                                                        <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Amount</div>
+                                                                        <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Status</div>
+                                                                    </div>
+                                                                    {customerOrders.map((o: Order) => (
+                                                                        <div key={o.id} className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-stone-50 last:border-none hover:bg-stone-50/50 transition-colors">
+                                                                            <div className="col-span-3 text-[10px] font-bold text-gray-400">{o.orderDate || '—'}</div>
+                                                                            <div className="col-span-3 text-[10px] font-black text-gray-700 uppercase">{o.clothType || '—'}</div>
+                                                                            <div className="col-span-2 text-[10px] font-bold text-gray-500">{o.deliveryDate}</div>
+                                                                            <div className="col-span-2 text-xs font-black text-gray-900 text-right">₹{o.amount.toLocaleString()}</div>
+                                                                            <div className="col-span-2 text-right">
+                                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                                                                    o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                                                                        'bg-amber-50 text-amber-600 border border-amber-100'
+                                                                                    }`}>{o.status}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            {customer.measurementHistory && customer.measurementHistory.length > 0 && (
+                                                                <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
+                                                                    <div className="px-4 py-3 bg-stone-50 border-b border-stone-100 flex items-center gap-2">
+                                                                        <Scissors className="w-3.5 h-3.5 text-gray-400" />
+                                                                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Measurement Updates</span>
+                                                                    </div>
+                                                                    {customer.measurementHistory.map((h: any, i: number) => (
+                                                                        <div key={i} className="px-4 py-3 border-b border-stone-50 last:border-none hover:bg-stone-50/50 transition-colors">
+                                                                            <div className="flex justify-between items-center mb-1">
+                                                                                <span className="text-[10px] font-black text-gray-700 uppercase tracking-tight">{h.type} Updated</span>
+                                                                                <span className="text-[9px] font-bold text-gray-400 uppercase">{new Date(h.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                                            </div>
+                                                                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                                                                {Object.entries(h.measurements).map(([key, val]) => (
+                                                                                    <span key={key} className="text-[9px] font-medium text-gray-500">
+                                                                                        <span className="capitalize">{key}:</span> <span className="font-bold text-gray-700 font-sans">{val as string}&quot;</span>
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })()}
@@ -1129,6 +1202,22 @@ export default function Dashboard() {
                                 value={editCustomerForm.email}
                                 onChange={e => setEditCustomerForm({ ...editCustomerForm, email: e.target.value })}
                                 className="w-full px-3 py-2 text-sm font-bold text-gray-900 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:bg-white focus:border-orange-400 transition-colors"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Address</label>
+                            <textarea
+                                value={editCustomerForm.address}
+                                onChange={e => setEditCustomerForm({ ...editCustomerForm, address: e.target.value })}
+                                className="w-full px-3 py-2 text-sm font-bold text-gray-900 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:bg-white focus:border-orange-400 transition-colors min-h-[60px]"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Notes</label>
+                            <textarea
+                                value={editCustomerForm.notes}
+                                onChange={e => setEditCustomerForm({ ...editCustomerForm, notes: e.target.value })}
+                                className="w-full px-3 py-2 text-sm font-bold text-gray-900 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:bg-white focus:border-orange-400 transition-colors min-h-[40px]"
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-3 pt-2">

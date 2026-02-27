@@ -23,9 +23,17 @@ export interface Customer {
     ordersCount: number;
     totalSpent: number;
     lastOrderDate: string;
+    address?: string;
+    notes?: string;
     measurements?: {
         shirt?: { length: string; chest: string; waist: string; shoulder: string; sleeve: string; neck: string; cuff: string; lastUpdated?: string };
         pant?: { length: string; waist: string; hip: string; thigh: string; knee: string; bottom: string; lastUpdated?: string };
         kurta?: { length: string; chest: string; waist: string; hip: string; shoulder: string; sleeve: string; neck: string; lastUpdated?: string };
     };
+    measurementHistory?: Array<{
+        date: string;
+        type: 'shirt' | 'pant' | 'kurta';
+        measurements: any;
+        notes?: string;
+    }>;
 }

@@ -23,7 +23,9 @@ export default function NewCustomerForm({ isOpen, onOpenChange, onCustomerCreate
     const [newCustomerForm, setNewCustomerForm] = useState({
         name: '',
         email: '',
-        phone: ''
+        phone: '',
+        address: '',
+        notes: ''
     });
     const [isSaving, setIsSaving] = useState(false);
 
@@ -38,6 +40,8 @@ export default function NewCustomerForm({ isOpen, onOpenChange, onCustomerCreate
                     name: newCustomerForm.name,
                     email: newCustomerForm.email,
                     phone: newCustomerForm.phone,
+                    address: newCustomerForm.address,
+                    notes: newCustomerForm.notes,
                     ordersCount: 0,
                     totalSpent: 0,
                     lastOrderDate: ''
@@ -58,7 +62,7 @@ export default function NewCustomerForm({ isOpen, onOpenChange, onCustomerCreate
                 };
                 onCustomerCreated(newCustomer);
                 onOpenChange(false);
-                setNewCustomerForm({ name: '', email: '', phone: '' });
+                setNewCustomerForm({ name: '', email: '', phone: '', address: '', notes: '' });
             }
         } catch (error: any) {
             console.error('Error creating customer:', error);
@@ -104,6 +108,24 @@ export default function NewCustomerForm({ isOpen, onOpenChange, onCustomerCreate
                             onChange={e => setNewCustomerForm({ ...newCustomerForm, email: e.target.value })}
                             className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800 transition-all font-medium"
                             placeholder="e.g. jane@example.com"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Address</label>
+                        <textarea
+                            value={newCustomerForm.address}
+                            onChange={e => setNewCustomerForm({ ...newCustomerForm, address: e.target.value })}
+                            className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800 transition-all font-medium min-h-[80px]"
+                            placeholder="Customer's physical address"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Notes</label>
+                        <textarea
+                            value={newCustomerForm.notes}
+                            onChange={e => setNewCustomerForm({ ...newCustomerForm, notes: e.target.value })}
+                            className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-800 transition-all font-medium min-h-[60px]"
+                            placeholder="Special preferences, sizes, etc."
                         />
                     </div>
                     <DialogFooter className="pt-6 flex flex-row justify-end gap-3">
