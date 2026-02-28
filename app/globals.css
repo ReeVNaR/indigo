@@ -185,3 +185,39 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Scrollbar hide utility for horizontal scroll areas */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Custom scrollbar for vertical scroll areas */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Improve touch targets on mobile */
+@media (max-width: 640px) {
+  button, a, [role="button"] {
+    min-height: 36px;
+  }
+  
+  /* Prevent content from overflowing on small screens */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+}

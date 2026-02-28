@@ -900,9 +900,9 @@ export default function Dashboard() {
                                                         </span>
                                                     </div>
                                                     <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">{customer.name}</h2>
-                                                            <Badge variant="outline" className="text-[10px] font-bold text-gray-500 border-stone-200">CUSTOMER</Badge>
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <h2 className="text-lg sm:text-xl font-black text-gray-900 uppercase tracking-tight">{customer.name}</h2>
+                                                            <Badge variant="outline" className="text-[10px] font-bold text-gray-500 border-stone-200 hidden sm:inline-flex">CUSTOMER</Badge>
                                                             <button
                                                                 title="Edit Customer Details"
                                                                 onClick={() => {
@@ -915,16 +915,16 @@ export default function Dashboard() {
                                                                     });
                                                                     setIsEditCustomerModalOpen(true);
                                                                 }}
-                                                                className="ml-2 w-7 h-7 rounded-md bg-stone-50 border border-stone-200 flex items-center justify-center text-stone-400 hover:text-orange-500 hover:border-orange-200 hover:bg-orange-50 transition-colors shadow-sm"
+                                                                className="ml-1 w-7 h-7 rounded-md bg-stone-50 border border-stone-200 flex items-center justify-center text-stone-400 hover:text-orange-500 hover:border-orange-200 hover:bg-orange-50 transition-colors shadow-sm"
                                                             >
                                                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                                             </button>
                                                         </div>
                                                         <div className="flex flex-col gap-1 mt-1">
-                                                            <div className="flex items-center gap-2">
+                                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                                                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{customer.phone}</p>
-                                                                <span className="text-[10px] text-gray-300">|</span>
-                                                                <p className="text-[10px] font-bold text-gray-400">{customer.email}</p>
+                                                                <span className="text-[10px] text-gray-300 hidden sm:inline">|</span>
+                                                                <p className="text-[10px] font-bold text-gray-400 break-all">{customer.email}</p>
                                                             </div>
                                                             {customer.address && (
                                                                 <p className="text-[10px] font-medium text-gray-500 flex items-center gap-1">
@@ -959,7 +959,7 @@ export default function Dashboard() {
 
                                             {/* Profile Tabs Content */}
                                             <div className="flex flex-col gap-6">
-                                                <div className="flex border-b border-stone-200 gap-8">
+                                                <div className="flex border-b border-stone-200 gap-4 sm:gap-8 overflow-x-auto scrollbar-hide">
                                                     {[
                                                         { id: 'measures', label: 'Measurements' },
                                                         { id: 'history', label: 'Order History' }
@@ -1105,7 +1105,7 @@ export default function Dashboard() {
                                                                         <ShoppingCart className="w-3.5 h-3.5 text-gray-400" />
                                                                         <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Order History</span>
                                                                     </div>
-                                                                    <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-stone-50/50 border-b border-stone-100">
+                                                                    <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2 bg-stone-50/50 border-b border-stone-100">
                                                                         <div className="col-span-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Date</div>
                                                                         <div className="col-span-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Garment</div>
                                                                         <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">Delivery</div>
@@ -1113,16 +1113,33 @@ export default function Dashboard() {
                                                                         <div className="col-span-2 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Status</div>
                                                                     </div>
                                                                     {customerOrders.map((o: Order) => (
-                                                                        <div key={o.id} className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-stone-50 last:border-none hover:bg-stone-50/50 transition-colors">
-                                                                            <div className="col-span-3 text-[10px] font-bold text-gray-400">{o.orderDate || '—'}</div>
-                                                                            <div className="col-span-3 text-[10px] font-black text-gray-700 uppercase">{o.clothType || '—'}</div>
-                                                                            <div className="col-span-2 text-[10px] font-bold text-gray-500">{o.deliveryDate}</div>
-                                                                            <div className="col-span-2 text-xs font-black text-gray-900 text-right">₹{o.amount.toLocaleString()}</div>
-                                                                            <div className="col-span-2 text-right">
-                                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                                                                                    o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
-                                                                                        'bg-amber-50 text-amber-600 border border-amber-100'
-                                                                                    }`}>{o.status}</span>
+                                                                        <div key={o.id} className="px-4 py-3 border-b border-stone-50 last:border-none hover:bg-stone-50/50 transition-colors">
+                                                                            {/* Desktop: grid row */}
+                                                                            <div className="hidden sm:grid grid-cols-12 gap-2">
+                                                                                <div className="col-span-3 text-[10px] font-bold text-gray-400">{o.orderDate || '—'}</div>
+                                                                                <div className="col-span-3 text-[10px] font-black text-gray-700 uppercase">{o.clothType || '—'}</div>
+                                                                                <div className="col-span-2 text-[10px] font-bold text-gray-500">{o.deliveryDate}</div>
+                                                                                <div className="col-span-2 text-xs font-black text-gray-900 text-right">₹{o.amount.toLocaleString()}</div>
+                                                                                <div className="col-span-2 text-right">
+                                                                                    <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                                                                        o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                                                                            'bg-amber-50 text-amber-600 border border-amber-100'
+                                                                                        }`}>{o.status}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Mobile: stacked card */}
+                                                                            <div className="sm:hidden flex justify-between items-start gap-2">
+                                                                                <div className="flex-1 min-w-0">
+                                                                                    <p className="text-[11px] font-black text-gray-700 uppercase truncate">{o.clothType || '—'}</p>
+                                                                                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">{o.orderDate || '—'} → {o.deliveryDate}</p>
+                                                                                </div>
+                                                                                <div className="text-right shrink-0">
+                                                                                    <p className="text-xs font-black text-gray-900">₹{o.amount.toLocaleString()}</p>
+                                                                                    <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded inline-block mt-0.5 ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                                                                        o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                                                                            'bg-amber-50 text-amber-600 border border-amber-100'
+                                                                                        }`}>{o.status}</span>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     ))}
@@ -1441,7 +1458,7 @@ export default function Dashboard() {
                                         {/* Order Info Panel - Enhanced */}
                                         <div className="bg-white border-2 border-stone-100 rounded-2xl overflow-hidden shadow-sm flex flex-col group">
                                             {/* Top Section: Customer & Profile */}
-                                            <div className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-stone-50/50 to-white border-b border-stone-100">
+                                            <div className="p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-stone-50/50 to-white border-b border-stone-100">
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-16 h-16 rounded-2xl bg-[#131b2e] flex items-center justify-center border-2 border-white shadow-xl rotate-[-2deg] group-hover:rotate-0 transition-transform duration-500">
                                                         <span className="text-2xl font-black text-white uppercase italic">
@@ -1482,12 +1499,12 @@ export default function Dashboard() {
                                                 </div>
                                                 <div className="text-left sm:text-right w-full sm:w-auto">
                                                     <span className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] block mb-1">Order Valuation</span>
-                                                    <span className="text-3xl font-black text-[#131b2e] tabular-nums">₹{selectedOrderForDetails.amount.toLocaleString()}</span>
+                                                    <span className="text-2xl sm:text-3xl font-black text-[#131b2e] tabular-nums">₹{selectedOrderForDetails.amount.toLocaleString()}</span>
                                                 </div>
                                             </div>
 
                                             {/* Details Grid */}
-                                            <div className="grid grid-cols-2 md:grid-cols-4 border-b border-stone-100 divide-x divide-stone-100">
+                                            <div className="grid grid-cols-2 border-b border-stone-100 divide-x divide-stone-100">
                                                 <div className="p-4 bg-white/50">
                                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                                                         <Calendar className="w-3 h-3 text-orange-400" />

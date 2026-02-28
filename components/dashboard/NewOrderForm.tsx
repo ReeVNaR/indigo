@@ -859,7 +859,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
 
             {/* Measurement Edit Dialog */}
             <Dialog open={!!editingMeasurementsType} onOpenChange={(open) => { if (!open) setEditingMeasurementsType(null); }}>
-                <DialogContent className="sm:max-w-md bg-white border-2 border-slate-100 shadow-2xl rounded-2xl p-0 overflow-hidden">
+                <DialogContent className="sm:max-w-md bg-white border-2 border-slate-100 shadow-2xl rounded-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
                     <DialogHeader className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex flex-row items-center justify-between">
                         <DialogTitle className="text-sm font-black text-[#131b2e] uppercase tracking-wider">
                             {editingMeasurementsType === 'Custom' ?
@@ -868,8 +868,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                         </DialogTitle>
                     </DialogHeader>
 
-                    <div className="p-6 space-y-6">
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-2 border-t border-stone-50">
+                    <div className="p-4 sm:p-6 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 pt-2 border-t border-stone-50">
                             {(() => {
                                 const type = editingMeasurementsType?.toLowerCase();
                                 const isCustom = type === 'custom';
@@ -903,7 +903,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                 </button>
                                             </div>
                                         )}
-                                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                                             {allFields.map(field => (
                                                 <div key={field} className="flex items-center justify-between border-b border-stone-50 pb-2">
                                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest capitalize">{field}</label>
@@ -925,7 +925,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                     }
                                                                 }));
                                                             }}
-                                                            className="w-14 h-8 text-right text-xs font-black text-[#131b2e] bg-slate-50 border border-stone-200 rounded px-2 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+                                                            className="w-16 sm:w-14 h-9 sm:h-8 text-right text-xs font-black text-[#131b2e] bg-slate-50 border border-stone-200 rounded px-2 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
                                                         />
                                                         <span className="text-[10px] font-bold text-slate-400">&quot;</span>
                                                         {extraFields.includes(field) && (

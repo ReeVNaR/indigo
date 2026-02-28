@@ -263,8 +263,8 @@ export default function ReportsView({ orders, customers }: ReportsViewProps) {
         <div className="space-y-6 sm:space-y-8">
 
             {/* Date Range Filter */}
-            <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border border-stone-100 shadow-sm">
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-2">Time Period</span>
+            <div className="flex items-center gap-2 bg-white p-3 rounded-xl border border-stone-100 shadow-sm overflow-x-auto scrollbar-hide">
+                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-2 shrink-0">Time Period</span>
                 {([
                     { id: 'today', label: 'Today' },
                     { id: 'week', label: 'This Week' },
@@ -275,7 +275,7 @@ export default function ReportsView({ orders, customers }: ReportsViewProps) {
                     <button
                         key={opt.id}
                         onClick={() => setDateRange(opt.id)}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${dateRange === opt.id
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap shrink-0 ${dateRange === opt.id
                             ? 'bg-gray-900 text-white shadow-md'
                             : 'bg-stone-50 text-gray-500 hover:bg-stone-100 border border-stone-200'
                             }`}
@@ -453,10 +453,10 @@ export default function ReportsView({ orders, customers }: ReportsViewProps) {
                         <CardContent className="p-4 pt-6">
                             <div className="w-full h-[250px] sm:h-[280px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={garmentStats} layout="vertical" margin={{ left: 10, right: 20 }}>
+                                    <BarChart data={garmentStats} layout="vertical" margin={{ left: 0, right: 20 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                                         <XAxis type="number" tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
-                                        <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fontWeight: 800, fill: '#1e293b' }} tickLine={false} axisLine={false} width={80} />
+                                        <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fontWeight: 800, fill: '#1e293b' }} tickLine={false} axisLine={false} width={60} />
                                         <Tooltip formatter={(value: any, name: any) => [name === 'count' ? `${value} orders` : `₹${Number(value).toLocaleString()}`, name === 'count' ? 'Orders' : 'Revenue']} />
                                         <Bar dataKey="count" fill="#f97316" radius={[0, 6, 6, 0]} barSize={18} name="Orders" />
                                     </BarChart>
