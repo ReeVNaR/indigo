@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/table";
 import NewCustomerForm from '@/components/dashboard/NewCustomerForm';
 import NewOrderForm from '@/components/dashboard/NewOrderForm';
+import ReportsView from '@/components/dashboard/ReportsView';
 import { Order, Customer, OrderStatus } from '@/lib/types';
 
 // --- Icons & Helpers ---
@@ -864,10 +865,16 @@ export default function Dashboard() {
                                                 </div>
                                                 <h4 className="font-bold text-gray-900 uppercase text-sm tracking-tight">{c.name}</h4>
                                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{c.phone}</p>
-                                                <div className="mt-3 text-[10px] flex justify-between items-center bg-stone-50 p-2 rounded border border-stone-100/50">
-                                                    <span className="font-bold text-gray-500 uppercase">{c.ordersCount} Total Orders</span>
-                                                    <span className="text-orange-600 font-black">₹{c.totalSpent.toLocaleString()} spent</span>
-                                                </div>
+                                                {(() => {
+                                                    const custOrders = orders.filter(o => o.customerName === c.name);
+                                                    const realSpent = custOrders.reduce((s, o) => s + o.amount, 0);
+                                                    return (
+                                                        <div className="mt-3 text-[10px] flex justify-between items-center bg-stone-50 p-2 rounded border border-stone-100/50">
+                                                            <span className="font-bold text-gray-500 uppercase">{custOrders.length || c.ordersCount} Total Orders</span>
+                                                            <span className="text-orange-600 font-black">₹{(realSpent || c.totalSpent).toLocaleString()} spent</span>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         ))
                                     )}
@@ -1367,14 +1374,9 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        {/* View: Reports (Placeholder) */}
+                        {/* View: Reports */}
                         {activeTab === 'reports' && (
-                            <div className="flex items-center justify-center h-64 border-2 border-dashed border-gray-200 rounded-xl">
-                                <div className="text-center">
-                                    <p className="text-gray-400 font-bold text-xl uppercase mb-2">Work in Progress</p>
-                                    <p className="text-gray-400 text-sm">This section is currently under construction.</p>
-                                </div>
-                            </div>
+                            <ReportsView orders={orders} customers={customers} />
                         )}
 
                         {/* Footer */}
