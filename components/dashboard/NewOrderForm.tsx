@@ -530,9 +530,10 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                 <input
                                                     type="number"
                                                     min="1"
-                                                    value={item.quantity}
+                                                    value={item.quantity === 0 ? '' : item.quantity}
                                                     onChange={e => updateItem(type, 'quantity', parseInt(e.target.value) || 1)}
                                                     className="w-full px-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl text-base font-black text-[#131c3f] outline-none focus:bg-white focus:border-[#131c3f]"
+                                                    placeholder="1"
                                                 />
                                             </div>
                                         </div>
@@ -542,7 +543,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                 <input
                                                     type="number"
                                                     min="0"
-                                                    value={item.price}
+                                                    value={item.price === 0 ? '' : item.price}
                                                     onChange={e => updateItem(type, 'price', parseFloat(e.target.value) || 0)}
                                                     className="w-full px-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-xl text-base font-black text-[#131c3f] outline-none focus:bg-white focus:border-[#131c3f]"
                                                     placeholder="0"
@@ -725,9 +726,10 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Advance (₹)</label>
                             <input
                                 type="number"
-                                value={newOrderForm.advancePaid}
+                                value={newOrderForm.advancePaid === 0 ? '' : newOrderForm.advancePaid}
                                 onChange={e => setNewOrderForm(p => ({ ...p, advancePaid: parseFloat(e.target.value) || 0 }))}
                                 className="w-full px-5 py-4 bg-white border-2 border-stone-100 rounded-2xl text-base font-bold text-[#131c3f] focus:border-orange-500 outline-none transition-all shadow-sm"
+                                placeholder="0"
                             />
                         </div>
                         <div className="space-y-2">
@@ -859,7 +861,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
 
             {/* Measurement Edit Dialog */}
             <Dialog open={!!editingMeasurementsType} onOpenChange={(open) => { if (!open) setEditingMeasurementsType(null); }}>
-                <DialogContent className="sm:max-w-md bg-white border-2 border-slate-100 shadow-2xl rounded-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
+                <DialogContent className="sm:max-w-md bg-white border-2 border-slate-100 shadow-2xl rounded-2xl p-0 overflow-hidden">
                     <DialogHeader className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex flex-row items-center justify-between">
                         <DialogTitle className="text-sm font-black text-[#131b2e] uppercase tracking-wider">
                             {editingMeasurementsType === 'Custom' ?
@@ -868,8 +870,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                         </DialogTitle>
                     </DialogHeader>
 
-                    <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
-                        <div className="space-y-6">
+                    <div className="p-6 space-y-6">
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-2 border-t border-stone-50">
                             {(() => {
                                 const type = editingMeasurementsType?.toLowerCase();
                                 const isCustom = type === 'custom';
@@ -903,11 +905,11 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                 </button>
                                             </div>
                                         )}
-                                        <div className="space-y-2">
+                                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                                             {allFields.map(field => (
-                                                <div key={field} className="flex items-center justify-between border-b border-stone-100 pb-2 last:border-none">
-                                                    <label className="text-[10px] font-bold text-gray-400 uppercase w-32 capitalize">{field}</label>
-                                                    <div className="flex items-center gap-2 group">
+                                                <div key={field} className="flex items-center justify-between border-b border-stone-50 pb-2">
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest capitalize">{field}</label>
+                                                    <div className="flex items-center gap-1 group">
                                                         <input
                                                             type="number"
                                                             step="0.125"
@@ -925,10 +927,9 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                     }
                                                                 }));
                                                             }}
-                                                            placeholder="0"
-                                                            className="w-16 text-right text-xs font-black text-gray-900 bg-stone-50 border border-stone-200 rounded px-2 py-1.5 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                                                            className="w-14 h-8 text-right text-xs font-black text-[#131b2e] bg-slate-50 border border-stone-200 rounded px-2 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
                                                         />
-                                                        <span className="text-[10px] font-bold text-gray-400">&quot;</span>
+                                                        <span className="text-[10px] font-bold text-slate-400">&quot;</span>
                                                         {extraFields.includes(field) && (
                                                             <button
                                                                 onClick={() => {
@@ -942,7 +943,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                         }
                                                                     }));
                                                                 }}
-                                                                className="p-1 text-red-400 hover:text-red-600 transition-colors"
+                                                                className="p-1 text-gray-300 hover:text-red-500"
                                                             >
                                                                 <Trash2 className="w-3 h-3" />
                                                             </button>
@@ -969,7 +970,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                     ...prev,
                                                                     measurements: {
                                                                         ...prev.measurements,
-                                                                        [type!]: { ...((prev.measurements?.[type as keyof Customer['measurements']] as any) || {}), [field]: '' }
+                                                                        [type!]: { ...((prev.measurements?.[type as any] as any) || {}), [field]: '' }
                                                                     }
                                                                 }));
                                                                 setNewFieldName('');
@@ -987,7 +988,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                     ...prev,
                                                                     measurements: {
                                                                         ...prev.measurements,
-                                                                        [type!]: { ...((prev.measurements?.[type as keyof Customer['measurements']] as any) || {}), [field]: '' }
+                                                                        [type!]: { ...((prev.measurements?.[type as any] as any) || {}), [field]: '' }
                                                                     }
                                                                 }));
                                                                 setNewFieldName('');
