@@ -1,29 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
-// In production, store these in environment variables or a database.
-// For now, we use a hardcoded credential check.
-// Default: email = "admin@dadashri.com", password = "Dadashri@123"
+// Credentials — set in .env.local or use defaults
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@dadashri.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Dadashri@123';
 
-// Generate a secure session token
-function generateSessionToken(): string {
-    return crypto.randomBytes(32).toString('hex');
+// Secret key for signing tokens — falls back to a static key for dev
+const SECRET = process.env.AUTH_SECRET || 'dadashri-designers-secret-key-2024';
+
+// Session duration: 1 day in seconds
+const SESSION_DURATION = 24 * 60 * 60;
+
+/**
+ * Creates a signed token: email|expiresAt|signature
+ * The signature = HMAC-SHA256(email|expiresAt, SECRET)
+ * This is stateless — no server-side storage needed.
+ */
+function createToken(email: string): string {
+    const expiresAt = Math.floor(Date.now() / 1000) + SESSION_DURATION;
+    const payload = `${email}|${expiresAt}`;
+    const signature = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
+    // Base64 encode the full token for safe cookie storage
+    return Buffer.from(`${payload}|${signature}`).toString('base64');
 }
 
-// In-memory session store (works for single-instance deployments)
-// For production, use Redis or a database
-const sessions = new Map<string, { email: string; createdAt: number }>();
+/**
+ * Verifies a signed token. Returns the email if valid, null if invalid/expired.
+ */
+function verifyToken(token: string): string | null {
+    try {
+        const decoded = Buffer.from(token, 'base64').toString('utf-8');
+        const parts = decoded.split('|');
+        if (parts.length !== 3) return null;
 
-// Clean expired sessions (24 hour expiry)
-const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000;
-function cleanExpiredSessions() {
-    const now = Date.now();
-    for (const [token, session] of sessions.entries()) {
-        if (now - session.createdAt > SESSION_EXPIRY_MS) {
-            sessions.delete(token);
-        }
+        const [email, expiresAtStr, signature] = parts;
+        const expiresAt = parseInt(expiresAtStr, 10);
+
+        // Check expiry
+        if (Date.now() / 1000 > expiresAt) return null;
+
+        // Verify signature
+        const expectedPayload = `${email}|${expiresAtStr}`;
+        const expectedSignature = crypto.createHmac('sha256', SECRET).update(expectedPayload).digest('hex');
+
+        // Constant-time comparison to prevent timing attacks
+        if (signature.length !== expectedSignature.length) return null;
+        const sigBuffer = Buffer.from(signature, 'hex');
+        const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+        if (!crypto.timingSafeEqual(sigBuffer, expectedBuffer)) return null;
+
+        return email;
+    } catch {
+        return null;
     }
 }
 
@@ -47,12 +75,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Clean old sessions
-        cleanExpiredSessions();
-
-        // Create session
-        const token = generateSessionToken();
-        sessions.set(token, { email, createdAt: Date.now() });
+        // Create signed token
+        const token = createToken(email);
 
         // Set HTTP-only cookie
         const response = NextResponse.json({ success: true });
@@ -61,7 +85,7 @@ export async function POST(req: NextRequest) {
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
             path: '/',
-            maxAge: 60 * 60 * 24, // 24 hours
+            maxAge: SESSION_DURATION, // 1 day
         });
 
         return response;
@@ -77,27 +101,20 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
     const token = req.cookies.get('session_token')?.value;
 
-    if (!token || !sessions.has(token)) {
+    if (!token) {
         return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 
-    const session = sessions.get(token)!;
-    if (Date.now() - session.createdAt > SESSION_EXPIRY_MS) {
-        sessions.delete(token);
+    const email = verifyToken(token);
+    if (!email) {
         return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 
-    return NextResponse.json({ authenticated: true, email: session.email });
+    return NextResponse.json({ authenticated: true, email });
 }
 
 // LOGOUT (DELETE)
 export async function DELETE(req: NextRequest) {
-    const token = req.cookies.get('session_token')?.value;
-
-    if (token) {
-        sessions.delete(token);
-    }
-
     const response = NextResponse.json({ success: true });
     response.cookies.set('session_token', '', {
         httpOnly: true,

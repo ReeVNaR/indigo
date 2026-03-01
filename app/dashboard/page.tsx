@@ -57,6 +57,7 @@ import {
 import NewCustomerForm from '@/components/dashboard/NewCustomerForm';
 import NewOrderForm from '@/components/dashboard/NewOrderForm';
 import ReportsView from '@/components/dashboard/ReportsView';
+import FinanceView from '@/components/dashboard/FinanceView';
 import { Order, Customer, OrderStatus } from '@/lib/types';
 
 // --- Icons & Helpers ---
@@ -67,6 +68,7 @@ const SidebarIcon = ({ name, active }: { name: string; active?: boolean }) => {
         case 'customers': return <Users className={className} />;
         case 'orders': return <ShoppingCart className={className} />;
         case 'reports': return <BarChart3 className={className} />;
+        case 'finance': return <CreditCard className={className} />;
         case 'settings': return <Settings className={className} />;
         case 'scissors': return <Scissors className={className} />;
         case 'logout': return <LogOut className={className} />;
@@ -124,6 +126,7 @@ const SidebarContent = ({ activeTab, setActiveTab, onLogout, shopName, masterTai
                     { name: 'Customers', id: 'customers' },
                     { name: 'Orders', id: 'orders' },
                     { name: 'Reports', id: 'reports' },
+                    { name: 'Finance', id: 'finance' },
                     { name: 'Settings', id: 'settings' },
                 ].map((item) => (
                     <button
@@ -1428,6 +1431,11 @@ export default function Dashboard() {
                         {/* View: Reports */}
                         {activeTab === 'reports' && (
                             <ReportsView orders={orders} customers={customers} />
+                        )}
+
+                        {/* View: Finance */}
+                        {activeTab === 'finance' && (
+                            <FinanceView orders={orders} />
                         )}
 
                         {/* Footer */}

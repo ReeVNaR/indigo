@@ -7,8 +7,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     IndianRupee, TrendingUp, TrendingDown, Package, Users, Truck,
     CreditCard, Scissors, Calendar, AlertTriangle, CheckCircle2,
-    Clock, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight
+    Clock, BarChart3, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, Download, Loader2
 } from "lucide-react";
+import * as XLSX from 'xlsx';
 import { Order, Customer } from '@/lib/types';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -31,6 +32,7 @@ const PAYMENT_COLORS = { Unpaid: '#ef4444', Partial: '#f59e0b', Paid: '#22c55e' 
 
 export default function ReportsView({ orders, customers }: ReportsViewProps) {
     const [dateRange, setDateRange] = useState<DateRange>('all');
+    const [isExporting, setIsExporting] = useState(false);
 
     // --- Date filtering ---
     const filteredOrders = useMemo(() => {
@@ -259,10 +261,147 @@ export default function ReportsView({ orders, customers }: ReportsViewProps) {
         </div>
     );
 
+    // ========== EXCEL EXPORT ==========
+    const exportToExcel = () => {
+        setIsExporting(true);
+        try {
+            const wb = XLSX.utils.book_new();
+            const dateLabel = dateRange === 'all' ? 'All Time' : dateRange === 'today' ? 'Today' : dateRange === 'week' ? 'This Week' : dateRange === 'month' ? 'This Month' : '3 Months';
+
+            // --- Sheet 1: Orders Summary ---
+            const ordersData = filteredOrders.map(o => {
+                const totalPaid = (o.advancePaid || 0) + (o.payments || []).reduce((s, p) => s + p.amount, 0);
+                const due = o.amount - totalPaid;
+                return {
+                    'Customer Name': o.customerName,
+                    'Cloth Type': o.clothType,
+                    'Order Date': o.orderDate ? new Date(o.orderDate).toLocaleDateString('en-IN') : '-',
+                    'Delivery Date': new Date(o.deliveryDate).toLocaleDateString('en-IN'),
+                    'Amount (₹)': o.amount,
+                    'Advance Paid (₹)': o.advancePaid || 0,
+                    'Payments (₹)': (o.payments || []).reduce((s, p) => s + p.amount, 0),
+                    'Total Paid (₹)': totalPaid,
+                    'Due (₹)': due > 0 ? due : 0,
+                    'Status': o.status,
+                    'Payment Status': due <= 0 ? 'Paid' : totalPaid > 0 ? 'Partial' : 'Unpaid',
+                    'Urgent': o.isUrgent ? 'Yes' : 'No',
+                    'Cloth Source': o.clothSource || 'Shop',
+                    'Quantity': o.quantity || 1,
+                };
+            });
+            const wsOrders = XLSX.utils.json_to_sheet(ordersData);
+            // Set column widths
+            wsOrders['!cols'] = [
+                { wch: 20 }, { wch: 18 }, { wch: 14 }, { wch: 14 },
+                { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+                { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 8 }, { wch: 14 }, { wch: 8 }
+            ];
+            XLSX.utils.book_append_sheet(wb, wsOrders, 'Orders');
+
+            // --- Sheet 2: Customer Analysis ---
+            const customerData = customers.map(c => {
+                const custOrders = orders.filter(o => o.customerName === c.name);
+                const totalBilled = custOrders.reduce((s, o) => s + o.amount, 0);
+                const totalPaid = custOrders.reduce((s, o) => s + (o.advancePaid || 0) + (o.payments || []).reduce((ps, p) => ps + p.amount, 0), 0);
+                return {
+                    'Customer Name': c.name,
+                    'Phone': c.phone,
+                    'Email': c.email,
+                    'Address': c.address || '-',
+                    'Total Orders': custOrders.length,
+                    'Total Billed (₹)': totalBilled,
+                    'Total Paid (₹)': totalPaid,
+                    'Outstanding (₹)': Math.max(0, totalBilled - totalPaid),
+                    'Last Order': c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString('en-IN') : '-',
+                    'Notes': c.notes || '-',
+                };
+            });
+            const wsCustomers = XLSX.utils.json_to_sheet(customerData);
+            wsCustomers['!cols'] = [
+                { wch: 20 }, { wch: 15 }, { wch: 25 }, { wch: 30 },
+                { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 20 }
+            ];
+            XLSX.utils.book_append_sheet(wb, wsCustomers, 'Customers');
+
+            // --- Sheet 3: Revenue Summary ---
+            const revenueSummary = [
+                { 'Metric': 'Total Billed', 'Value (₹)': revenue.totalBilled },
+                { 'Metric': 'Total Collected', 'Value (₹)': revenue.totalCollected },
+                { 'Metric': 'Outstanding Dues', 'Value (₹)': revenue.outstanding },
+                { 'Metric': 'Average Order Value', 'Value (₹)': Math.round(revenue.avgOrder) },
+                { 'Metric': 'Total Orders', 'Value (₹)': filteredOrders.length },
+                { 'Metric': 'Completion Rate', 'Value (₹)': `${orderStats.completionRate}%` },
+                { 'Metric': 'Collection Rate', 'Value (₹)': `${paymentStats.collectionRate}%` },
+            ];
+            const wsRevenue = XLSX.utils.json_to_sheet(revenueSummary);
+            wsRevenue['!cols'] = [{ wch: 25 }, { wch: 18 }];
+            XLSX.utils.book_append_sheet(wb, wsRevenue, 'Revenue Summary');
+
+            // --- Sheet 4: Garment Breakdown ---
+            const garmentData = garmentStats.map(g => ({
+                'Garment Type': g.name,
+                'Orders Count': g.count,
+                'Total Revenue (₹)': g.revenue,
+                'Avg per Order (₹)': g.avg,
+            }));
+            if (garmentData.length > 0) {
+                const wsGarments = XLSX.utils.json_to_sheet(garmentData);
+                wsGarments['!cols'] = [{ wch: 20 }, { wch: 14 }, { wch: 18 }, { wch: 16 }];
+                XLSX.utils.book_append_sheet(wb, wsGarments, 'Garment Breakdown');
+            }
+
+            // --- Sheet 5: Payment Analysis ---
+            const paymentData = filteredOrders.map(o => {
+                const payments = o.payments || [];
+                const totalPaid = (o.advancePaid || 0) + payments.reduce((s, p) => s + p.amount, 0);
+                return {
+                    'Customer': o.customerName,
+                    'Cloth Type': o.clothType,
+                    'Order Amount (₹)': o.amount,
+                    'Advance (₹)': o.advancePaid || 0,
+                    'Subsequent Payments (₹)': payments.reduce((s, p) => s + p.amount, 0),
+                    'Total Paid (₹)': totalPaid,
+                    'Balance Due (₹)': Math.max(0, o.amount - totalPaid),
+                    'Payment Methods': payments.map(p => p.method).join(', ') || '-',
+                    'Status': totalPaid >= o.amount ? 'Fully Paid' : totalPaid > 0 ? 'Partial' : 'Unpaid',
+                };
+            });
+            const wsPayments = XLSX.utils.json_to_sheet(paymentData);
+            wsPayments['!cols'] = [
+                { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 12 },
+                { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 12 }
+            ];
+            XLSX.utils.book_append_sheet(wb, wsPayments, 'Payment Details');
+
+            // --- Sheet 6: Delivery Performance ---
+            const deliveryData = [
+                { 'Metric': 'On-Time Delivery Rate', 'Value': `${deliveryStats.onTimeRate}%` },
+                { 'Metric': 'Currently Overdue', 'Value': deliveryStats.overdueCount },
+                { 'Metric': 'Average Delay (days)', 'Value': deliveryStats.avgDelay },
+                { 'Metric': 'Due Today', 'Value': deliveryStats.dueToday },
+                { 'Metric': 'Due This Week', 'Value': deliveryStats.dueThisWeek },
+                { 'Metric': 'Busiest Day', 'Value': orderStats.busiestDay },
+                { 'Metric': 'Avg Turnaround (days)', 'Value': orderStats.avgTurnaround },
+            ];
+            const wsDelivery = XLSX.utils.json_to_sheet(deliveryData);
+            wsDelivery['!cols'] = [{ wch: 25 }, { wch: 18 }];
+            XLSX.utils.book_append_sheet(wb, wsDelivery, 'Delivery Stats');
+
+            // Generate filename with date
+            const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-');
+            XLSX.writeFile(wb, `Dadashri-Report-${dateLabel.replace(/ /g, '_')}-${today}.xlsx`);
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('Failed to export report. Please try again.');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
         <div className="space-y-6 sm:space-y-8">
 
-            {/* Date Range Filter */}
+            {/* Date Range Filter + Export */}
             <div className="flex items-center gap-2 bg-white p-3 rounded-xl border border-stone-100 shadow-sm overflow-x-auto scrollbar-hide">
                 <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-2 shrink-0">Time Period</span>
                 {([
@@ -283,6 +422,20 @@ export default function ReportsView({ orders, customers }: ReportsViewProps) {
                         {opt.label}
                     </button>
                 ))}
+                <div className="ml-auto pl-3 border-l border-stone-200 shrink-0">
+                    <button
+                        onClick={exportToExcel}
+                        disabled={isExporting}
+                        className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap bg-gradient-to-r from-orange-400 to-amber-600 hover:from-orange-500 hover:to-amber-700 text-white shadow-md shadow-orange-500/20 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        {isExporting ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                            <Download className="w-3.5 h-3.5" />
+                        )}
+                        {isExporting ? 'Exporting...' : 'Export Excel'}
+                    </button>
+                </div>
             </div>
 
             {/* ============ SECTION 1: REVENUE ============ */}
