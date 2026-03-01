@@ -64,7 +64,7 @@ export default function Home() {
         return;
       }
 
-      router.push("/dashboard");
+      router.replace("/dashboard");
     } catch (err) {
       console.error(err);
       setError('Connection error. Please try again.');

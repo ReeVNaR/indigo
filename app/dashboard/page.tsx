@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Menu,
@@ -161,7 +161,7 @@ const SidebarContent = ({ activeTab, setActiveTab, onLogout, shopName, masterTai
 
 export default function Dashboard() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState('dashboard');
+    const [activeTab, setActiveTabRaw] = useState('dashboard');
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [activeProfileTab, setActiveProfileTab] = useState<'measures' | 'history' | 'report'>('measures');
     const [editingMeasurementGarment, setEditingMeasurementGarment] = useState<'shirt' | 'pant' | 'kurta' | 'suit' | 'vest' | 'custom' | null>(null);
@@ -180,7 +180,7 @@ export default function Dashboard() {
     const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
     const [isEditCustomerModalOpen, setIsEditCustomerModalOpen] = useState(false);
     const [editCustomerForm, setEditCustomerForm] = useState({ name: '', phone: '', email: '', address: '', notes: '' });
-    const [statusFilter, setStatusFilter] = useState<OrderStatus | 'All'>('All');
+    const [statusFilter, setStatusFilter] = useState<OrderStatus | 'All' | 'Active'>('All');
     const [deliveryFilter, setDeliveryFilter] = useState<'All' | 'Today' | 'This Week' | 'Overdue'>('All');
     const [isRecordingPayment, setIsRecordingPayment] = useState(false);
     const [isAddingExtraField, setIsAddingExtraField] = useState(false);
@@ -199,6 +199,36 @@ export default function Dashboard() {
     const currencySymbol = '₹';
     const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+    // -- History-aware tab navigation --
+    const isPopstateRef = useRef(false);
+    const activeTabRef = useRef('dashboard');
+
+    const setActiveTab = useCallback((tab: string) => {
+        setActiveTabRaw(tab);
+        activeTabRef.current = tab;
+        // Only push history if this is NOT triggered by the popstate (back/forward) event
+        if (!isPopstateRef.current) {
+            window.history.pushState({ tab }, '', '/dashboard');
+        }
+    }, []);
+
+    // Listen for browser back/forward button
+    useEffect(() => {
+        const handlePopState = (e: PopStateEvent) => {
+            if (e.state && e.state.tab) {
+                isPopstateRef.current = true;
+                setActiveTabRaw(e.state.tab);
+                activeTabRef.current = e.state.tab;
+                isPopstateRef.current = false;
+            } else {
+                // We'd leave the dashboard — push forward to stay
+                window.history.pushState({ tab: activeTabRef.current }, '', '/dashboard');
+            }
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
     // -- Auth Check --
     useEffect(() => {
         const checkAuth = async () => {
@@ -209,6 +239,8 @@ export default function Dashboard() {
                     return;
                 }
                 setIsAuthenticated(true);
+                // Replace the current history entry with dashboard state so we have a base
+                window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
             } catch {
                 router.push('/');
             }
@@ -262,7 +294,9 @@ export default function Dashboard() {
         let result = orders;
 
         // Status Filter
-        if (statusFilter !== 'All') {
+        if (statusFilter === 'Active') {
+            result = result.filter(o => o.status !== 'Completed');
+        } else if (statusFilter !== 'All') {
             result = result.filter(o => o.status === statusFilter);
         }
 
@@ -361,6 +395,23 @@ export default function Dashboard() {
         } catch (error) {
             console.error('Error deleting order:', error);
             alert('Failed to delete order.');
+        }
+    };
+
+    const deleteCustomer = async (id: string, name: string) => {
+        const confirmed = window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`);
+        if (!confirmed) return;
+        try {
+            const res = await fetch(`/api/customers?id=${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete customer');
+            setCustomers(customers.filter(c => c.id !== id));
+            if (selectedCustomerId === id) {
+                setSelectedCustomerId(null);
+                setActiveTab('customers');
+            }
+        } catch (error) {
+            console.error('Error deleting customer:', error);
+            alert('Failed to delete customer.');
         }
     };
 
@@ -632,7 +683,7 @@ export default function Dashboard() {
                                     <TableCell className="px-6 py-4 text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600 h-8 w-8">
+                                                <Button variant="ghost" size="icon" className="text-gray-600 hover:text-orange-500 h-8 w-8">
                                                     <MoreVertical className="w-4 h-4" />
                                                 </Button>
                                             </DropdownMenuTrigger>
@@ -784,17 +835,21 @@ export default function Dashboard() {
                                 {/* Stats Grid */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
                                     {[
-                                        { label: 'Total Orders', val: orders.length.toString(), sub: `+${orders.filter(o => o.orderDate?.split('T')[0] === new Date().toISOString().split('T')[0]).length}`, subText: 'new today', subColor: 'text-emerald-500 font-bold', iconType: 'orders' },
-                                        { label: 'Active Orders', val: activeOrdersCount.toString(), sub: `! ${urgentOrdersCount} Urgent`, subText: 'pending', subColor: 'text-orange-500 font-bold', iconType: 'orders' },
+                                        { label: 'Total Orders', val: orders.length.toString(), sub: `+${orders.filter(o => o.orderDate?.split('T')[0] === new Date().toISOString().split('T')[0]).length}`, subText: 'new today', subColor: 'text-emerald-500 font-bold', iconType: 'orders', action: () => { setStatusFilter('All'); setDeliveryFilter('All'); setActiveTab('orders'); } },
+                                        { label: 'Active Orders', val: activeOrdersCount.toString(), sub: `! ${urgentOrdersCount} Urgent`, subText: 'pending', subColor: 'text-orange-500 font-bold', iconType: 'orders', action: () => { setStatusFilter('Active'); setDeliveryFilter('All'); setActiveTab('orders'); } },
                                         {
                                             label: "Today's Deliveries", val: completedToday.toString(), sub: '🕒 Pending', subText: orders.filter(o => {
                                                 const today = new Date().toISOString().split('T')[0];
                                                 return o.deliveryDate === today && o.status !== 'Completed';
-                                            }).length.toString(), subColor: 'text-slate-500', iconType: 'delivery'
+                                            }).length.toString(), subColor: 'text-slate-500', iconType: 'delivery', action: () => { setStatusFilter('All'); setDeliveryFilter('Today'); setActiveTab('orders'); }
                                         },
-                                        { label: "Today's Earnings", val: `${currencySymbol}${dailyEarnings.toLocaleString()}`, sub: `Total ${currencySymbol}${totalRevenue.toLocaleString()}`, subText: '', subColor: 'text-emerald-500 font-bold', iconType: 'money' },
+                                        { label: "Today's Earnings", val: `${currencySymbol}${dailyEarnings.toLocaleString()}`, sub: `Total ${currencySymbol}${totalRevenue.toLocaleString()}`, subText: '', subColor: 'text-emerald-500 font-bold', iconType: 'money', action: () => { setActiveTab('finance'); } },
                                     ].map((stat, idx) => (
-                                        <Card key={idx} className="relative overflow-hidden group hover:shadow-md transition-shadow border-stone-100 flex flex-col h-full">
+                                        <Card
+                                            key={idx}
+                                            onClick={() => stat.action()}
+                                            className="relative overflow-hidden group hover:shadow-md transition-shadow border-stone-100 flex flex-col h-full cursor-pointer"
+                                        >
                                             <div className="absolute left-0 top-2 bottom-2 w-[3px] border-l-2 border-dashed border-red-400 opacity-60"></div>
                                             <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2 space-y-0">
                                                 <CardTitle className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -830,6 +885,7 @@ export default function Dashboard() {
                                             className="w-full px-3 py-2 text-sm font-bold text-gray-900 bg-stone-50 border border-stone-200 rounded-lg outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all select-none"
                                         >
                                             <option value="All">All Statuses</option>
+                                            <option value="Active">Active (Not Completed)</option>
                                             <option value="Received">Received</option>
                                             <option value="Cutting">Cutting</option>
                                             <option value="Fitting">Fitting</option>
@@ -855,7 +911,7 @@ export default function Dashboard() {
                                         <Button
                                             variant="ghost"
                                             onClick={() => { setStatusFilter('All'); setDeliveryFilter('All'); setGlobalSearchQuery(''); }}
-                                            className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-orange-500 transition-colors"
+                                            className="text-[10px] font-bold text-orange-400 uppercase tracking-widest hover:text-orange-600 transition-colors"
                                         >
                                             Reset Filters
                                         </Button>
@@ -891,27 +947,40 @@ export default function Dashboard() {
                                         globalFilteredCustomers.map(c => (
                                             <div
                                                 key={c.id}
-                                                onClick={() => {
-                                                    setSelectedCustomerId(c.id);
-                                                    setActiveTab('customer_profile');
-                                                }}
                                                 className="p-4 border border-stone-100 rounded-lg hover:bg-gray-50 bg-white cursor-pointer transition-colors group relative"
                                             >
-                                                <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                                <div className="absolute right-4 top-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteCustomer(c.id, c.name);
+                                                        }}
+                                                        className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-all"
+                                                        title="Delete customer"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <svg className="w-3.5 h-3.5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                                 </div>
-                                                <h4 className="font-bold text-gray-900 uppercase text-sm tracking-tight">{c.name}</h4>
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{c.phone}</p>
-                                                {(() => {
-                                                    const custOrders = orders.filter(o => o.customerName === c.name);
-                                                    const realSpent = custOrders.reduce((s, o) => s + o.amount, 0);
-                                                    return (
-                                                        <div className="mt-3 text-[10px] flex justify-between items-center bg-stone-50 p-2 rounded border border-stone-100/50">
-                                                            <span className="font-bold text-gray-500 uppercase">{custOrders.length || c.ordersCount} Total Orders</span>
-                                                            <span className="text-orange-600 font-black">₹{(realSpent || c.totalSpent).toLocaleString()} spent</span>
-                                                        </div>
-                                                    );
-                                                })()}
+                                                <div
+                                                    onClick={() => {
+                                                        setSelectedCustomerId(c.id);
+                                                        setActiveTab('customer_profile');
+                                                    }}
+                                                >
+                                                    <h4 className="font-bold text-gray-900 uppercase text-sm tracking-tight">{c.name}</h4>
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{c.phone}</p>
+                                                    {(() => {
+                                                        const custOrders = orders.filter(o => o.customerName === c.name);
+                                                        const realSpent = custOrders.reduce((s, o) => s + o.amount, 0);
+                                                        return (
+                                                            <div className="mt-3 text-[10px] flex justify-between items-center bg-stone-50 p-2 rounded border border-stone-100/50">
+                                                                <span className="font-bold text-gray-500 uppercase">{custOrders.length || c.ordersCount} Total Orders</span>
+                                                                <span className="text-orange-600 font-black">₹{(realSpent || c.totalSpent).toLocaleString()} spent</span>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
                                             </div>
                                         ))
                                     )}
@@ -1846,7 +1915,7 @@ export default function Dashboard() {
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-3 pt-2">
-                            <Button type="button" variant="outline" onClick={() => setIsEditCustomerModalOpen(false)} className="py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-stone-200 hover:bg-stone-50 transition-colors">Cancel</Button>
+                            <Button type="button" variant="outline" onClick={() => setIsEditCustomerModalOpen(false)} className="py-2.5 text-[10px] font-bold text-gray-600 uppercase tracking-widest border-stone-200 hover:bg-stone-50 transition-colors">Cancel</Button>
                             <Button type="submit" className="py-2.5 text-[10px] font-black text-white bg-gray-900 uppercase tracking-widest hover:bg-black transition-colors">Save Changes</Button>
                         </div>
                     </form>
@@ -1924,7 +1993,7 @@ export default function Dashboard() {
                                                         delete newForm[field];
                                                         setMeasurementForm(newForm);
                                                     }}
-                                                    className="p-1 text-gray-300 hover:text-red-500 transition-colors"
+                                                    className="p-1 text-red-400 hover:text-red-600 transition-colors"
                                                 >
                                                     <Trash2 className="w-3 h-3" />
                                                 </button>

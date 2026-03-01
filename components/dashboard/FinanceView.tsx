@@ -552,7 +552,7 @@ export default function FinanceView({ orders }: FinanceViewProps) {
                                                 {txn.source === 'expense' && (
                                                     <button
                                                         onClick={() => handleDeleteExpense(txn.id)}
-                                                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-all shrink-0"
+                                                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-all shrink-0"
                                                         title="Delete expense"
                                                     >
                                                         <Trash2 className="w-3.5 h-3.5" />
@@ -642,7 +642,7 @@ export default function FinanceView({ orders }: FinanceViewProps) {
                                 type="button"
                                 variant="outline"
                                 onClick={() => setIsAddModalOpen(false)}
-                                className="py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-stone-200 hover:bg-stone-50 transition-colors"
+                                className="py-2.5 text-[10px] font-bold text-gray-600 uppercase tracking-widest border-stone-200 hover:bg-stone-50 transition-colors"
                             >
                                 Cancel
                             </Button>

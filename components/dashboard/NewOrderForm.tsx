@@ -868,8 +868,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                         </DialogTitle>
                     </DialogHeader>
 
-                    <div className="p-4 sm:p-6 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 pt-2 border-t border-stone-50">
+                    <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+                        <div className="space-y-6">
                             {(() => {
                                 const type = editingMeasurementsType?.toLowerCase();
                                 const isCustom = type === 'custom';
@@ -903,11 +903,11 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                 </button>
                                             </div>
                                         )}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                                        <div className="space-y-2">
                                             {allFields.map(field => (
-                                                <div key={field} className="flex items-center justify-between border-b border-stone-50 pb-2">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest capitalize">{field}</label>
-                                                    <div className="flex items-center gap-1 group">
+                                                <div key={field} className="flex items-center justify-between border-b border-stone-100 pb-2 last:border-none">
+                                                    <label className="text-[10px] font-bold text-gray-400 uppercase w-32 capitalize">{field}</label>
+                                                    <div className="flex items-center gap-2 group">
                                                         <input
                                                             type="number"
                                                             step="0.125"
@@ -925,9 +925,10 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                     }
                                                                 }));
                                                             }}
-                                                            className="w-16 sm:w-14 h-9 sm:h-8 text-right text-xs font-black text-[#131b2e] bg-slate-50 border border-stone-200 rounded px-2 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
+                                                            placeholder="0"
+                                                            className="w-16 text-right text-xs font-black text-gray-900 bg-stone-50 border border-stone-200 rounded px-2 py-1.5 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-500/20 transition-all"
                                                         />
-                                                        <span className="text-[10px] font-bold text-slate-400">&quot;</span>
+                                                        <span className="text-[10px] font-bold text-gray-400">&quot;</span>
                                                         {extraFields.includes(field) && (
                                                             <button
                                                                 onClick={() => {
@@ -941,7 +942,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                         }
                                                                     }));
                                                                 }}
-                                                                className="p-1 text-gray-300 hover:text-red-500"
+                                                                className="p-1 text-red-400 hover:text-red-600 transition-colors"
                                                             >
                                                                 <Trash2 className="w-3 h-3" />
                                                             </button>
