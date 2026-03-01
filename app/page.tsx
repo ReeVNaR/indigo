@@ -42,18 +42,32 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
 
     try {
-      // Simulating network request
-      await new Promise(resolve => setTimeout(resolve, 800));
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Invalid credentials. Please try again.');
+        return;
+      }
+
       router.push("/dashboard");
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
+      setError('Connection error. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -90,6 +104,12 @@ export default function Home() {
 
           {/* Login Form */}
           <form className="w-full space-y-4 sm:space-y-5" onSubmit={handleLogin}>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 text-xs font-semibold px-4 py-3 rounded-lg text-center animate-in fade-in slide-in-from-top-1 duration-300">
+                {error}
+              </div>
+            )}
 
             <div className="space-y-1.5 sm:space-y-1">
               <Label htmlFor="email" className="text-[10px] font-bold text-gray-500 tracking-wider uppercase block ml-0.5">

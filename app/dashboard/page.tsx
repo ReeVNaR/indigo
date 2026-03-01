@@ -194,15 +194,39 @@ export default function Dashboard() {
     });
     const [isSavingSettings, setIsSavingSettings] = useState(false);
     const currencySymbol = '₹';
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-    // -- Data Fetching --
+    // -- Auth Check --
     useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const res = await fetch('/api/auth');
+                if (!res.ok) {
+                    router.push('/');
+                    return;
+                }
+                setIsAuthenticated(true);
+            } catch {
+                router.push('/');
+            }
+        };
+        checkAuth();
+    }, [router]);
+
+    // -- Data Fetching (only after auth is confirmed) --
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
         const fetchData = async () => {
             setIsLoading(true);
             setFetchError(null);
             try {
                 // Fetch Orders
                 const ordersRes = await fetch('/api/orders');
+                if (ordersRes.status === 401) {
+                    router.push('/');
+                    return;
+                }
                 if (!ordersRes.ok) throw new Error('Failed to fetch orders');
                 const ordersData = await ordersRes.json();
 
@@ -228,7 +252,7 @@ export default function Dashboard() {
         };
 
         fetchData();
-    }, []);
+    }, [isAuthenticated, router]);
 
     // -- Global Search and Filtered Orders --
     const filteredOrders = useMemo(() => {
@@ -514,6 +538,16 @@ export default function Dashboard() {
         return () => window.removeEventListener('click', handleClickOutside);
     }, []);
 
+    // -- Logout Handler --
+    const handleLogout = async () => {
+        try {
+            await fetch('/api/auth', { method: 'DELETE' });
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+        router.push('/');
+    };
+
     // -- Render Helpers --
 
     const getStatusColor = (status: string) => {
@@ -651,7 +685,7 @@ export default function Dashboard() {
                         <SidebarContent
                             activeTab={activeTab}
                             setActiveTab={setActiveTab}
-                            onLogout={() => router.push('/')}
+                            onLogout={handleLogout}
                             shopName={settingsForm.shopName}
                             masterTailor={settingsForm.masterTailor}
                         />
@@ -755,7 +789,7 @@ export default function Dashboard() {
                                                 return o.deliveryDate === today && o.status !== 'Completed';
                                             }).length.toString(), subColor: 'text-slate-500', iconType: 'delivery'
                                         },
-                                        { label: 'Daily Earnings', val: `${currencySymbol}${dailyEarnings.toLocaleString()}`, sub: `Total ${currencySymbol}${totalRevenue.toLocaleString()}`, subText: '', subColor: 'text-emerald-500 font-bold', iconType: 'money' },
+                                        { label: "Today's Earnings", val: `${currencySymbol}${dailyEarnings.toLocaleString()}`, sub: `Total ${currencySymbol}${totalRevenue.toLocaleString()}`, subText: '', subColor: 'text-emerald-500 font-bold', iconType: 'money' },
                                     ].map((stat, idx) => (
                                         <Card key={idx} className="relative overflow-hidden group hover:shadow-md transition-shadow border-stone-100 flex flex-col h-full">
                                             <div className="absolute left-0 top-2 bottom-2 w-[3px] border-l-2 border-dashed border-red-400 opacity-60"></div>
