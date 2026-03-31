@@ -970,7 +970,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                     ...prev,
                                                                     measurements: {
                                                                         ...prev.measurements,
-                                                                        [type!]: { ...((prev.measurements?.[type as any] as any) || {}), [field]: '' }
+                                                                        [(type!) as any]: { ...((prev.measurements as any)?.[type! as any] || {}), [field]: '' }
                                                                     }
                                                                 }));
                                                                 setNewFieldName('');
@@ -988,7 +988,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                     ...prev,
                                                                     measurements: {
                                                                         ...prev.measurements,
-                                                                        [type!]: { ...((prev.measurements?.[type as any] as any) || {}), [field]: '' }
+                                                                        [(type!) as any]: { ...((prev.measurements as any)?.[type! as any] || {}), [field]: '' }
                                                                     }
                                                                 }));
                                                                 setNewFieldName('');

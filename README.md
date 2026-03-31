@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Indigo - Dadashri Designers Dashboard
 
-## Getting Started
+A premium, tailored management system for **Dadashri Designers**, a high-end couture fashion house. Built with modern web technologies, this dashboard enables seamless management of customers, bespoke measurements, and order lifecycles.
 
-First, run the development server:
+![Dadashri Designers Logo](/public/Logo.png)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## ✨ Key Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Workshop Overview**: Real-time stats on active orders, urgent tasks, and daily revenue.
+- **Customer CRM**: 
+  - Centralized database for clients.
+  - Detailed profiles with measurement history for multiple garment types (Shirts, Pants, Kurtas, Suits, etc.).
+  - Custom measurement fields for specialized requirements.
+- **Order Management**:
+  - Full lifecycle tracking: *Processing → Cutting → Fitting → Ready → Completed*.
+  - Urgent order flags and delivery date monitoring.
+  - Interactive order details with payment tracking.
+- **Financial Tracking**:
+  - Daily earnings and total revenue highlights.
+  - Payment status monitoring (Paid, Partial, Unpaid).
+  - Record advances and subsequent payments.
+- **Responsive Design**: Fully optimized for both desktop workshop use and mobile access.
+- **Secure Access**: Admin authentication to protect sensitive client data.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🚀 Tech Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Framework**: [Next.js 15+](https://nextjs.org/) (App Router)
+- **Styling**: [Tailwind CSS 4](https://tailwindcss.com/) & [Shadcn UI](https://ui.shadcn.com/)
+- **Database**: [MongoDB](https://www.mongodb.com/) (for high-performance data storage)
+- **Charts**: [Recharts](https://recharts.org/) for business insights
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Components**: Radix UI primitives
 
-## Learn More
+## 🛠️ Getting Started
 
-To learn more about Next.js, take a look at the following resources:
+### Prerequisites
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Node.js 18.x or higher
+- MongoDB Atlas account (or local MongoDB instance)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Installation
 
-## Deploy on Vercel
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd indigo
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. **Environment Setup:**
+   Copy the `.env.example` file to `.env.local` and fill in your credentials.
+   ```bash
+   cp .env.example .env.local
+   ```
+   *Required variables:*
+   - `MONGODB_URI`: Your MongoDB connection string.
+   - `ADMIN_EMAIL`: Default admin email for login.
+   - `ADMIN_PASSWORD`: Default admin password.
+
+4. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
+
+5. **Build for production:**
+   ```bash
+   npm run build
+   npm run start
+   ```
+
+## 📂 Project Structure
+
+- `app/`: Next.js App Router pages and API routes.
+- `components/`: Reusable UI components (Shadcn + custom dashboard modules).
+- `lib/`: Utility functions, database connections (`mongodb.ts`), and TypeScript types.
+- `public/`: Static assets (Logo, Favicon).
+
+## 🔒 Security Note
+
+Ensure that `.env.local` is never committed to version control. The repository includes a `.gitignore` that handles this by default.
+
+---
+*Crafted for elegance. Est. 2026.*

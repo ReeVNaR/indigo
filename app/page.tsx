@@ -5,7 +5,15 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Key, ShieldCheck } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
 
 // --- Icons ---
 
@@ -45,6 +53,14 @@ export default function Home() {
   const [error, setError] = useState("");
   const router = useRouter();
 
+  // Reset Password Modal States
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [masterKey, setMasterKey] = useState("");
+  const [newPassInput, setNewPassInput] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState(false);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -70,6 +86,40 @@ export default function Home() {
       setError('Connection error. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setResetError("");
+    setResetSuccess(false);
+
+    try {
+      const res = await fetch('/api/auth/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ masterKey, newPassword: newPassInput }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setResetError(data.error || 'Reset failed. Check your Master Key.');
+        return;
+      }
+
+      setResetSuccess(true);
+      setMasterKey("");
+      setNewPassInput("");
+      
+      // Auto close after 2s
+      setTimeout(() => setIsResetModalOpen(false), 2000);
+    } catch (err) {
+      console.error(err);
+      setResetError('Reset failed. Connection error.');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -136,9 +186,13 @@ export default function Home() {
                 <Label htmlFor="password" className="text-[10px] font-bold text-gray-500 tracking-wider uppercase block ml-0.5">
                   Password
                 </Label>
-                <a href="#" className="text-[11px] font-bold text-orange-400 hover:text-orange-600 transition-colors uppercase tracking-wide">
+                <button
+                  type="button"
+                  onClick={() => setIsResetModalOpen(true)}
+                  className="text-[11px] font-bold text-orange-400 hover:text-orange-600 transition-colors uppercase tracking-wide outline-none focus:underline"
+                >
                   Forgot?
-                </a>
+                </button>
               </div>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
@@ -183,6 +237,79 @@ export default function Home() {
           EST. 2026 • CRAFTED FOR ELEGANCE
         </p>
       </div>
+
+      {/* Forgot Password Reset Modal */}
+      <Dialog open={isResetModalOpen} onOpenChange={setIsResetModalOpen}>
+        <DialogContent className="sm:max-w-md bg-white border-2 border-stone-100 shadow-2xl rounded-2xl p-0 overflow-hidden">
+          <form onSubmit={handleResetPassword}>
+            <DialogHeader className="px-6 py-5 border-b border-stone-50 bg-stone-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-black text-[#131c3f] uppercase tracking-tight">Recover Access</DialogTitle>
+                  <DialogDescription className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Use your Master Reset Key</DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="p-8 space-y-5">
+              {resetError && (
+                <div className="bg-red-50 border border-red-100 text-red-600 text-[10px] font-bold px-4 py-3 rounded-xl text-center uppercase tracking-wide">
+                  {resetError}
+                </div>
+              )}
+
+              {resetSuccess && (
+                <div className="bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-bold px-4 py-3 rounded-xl text-center uppercase tracking-wide flex items-center justify-center gap-2">
+                  <ShieldCheck className="w-4 h-4" /> Password Updated Successfully!
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="masterKey" className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block ml-0.5">
+                  Master Security Key
+                </Label>
+                <Input
+                  id="masterKey"
+                  type="password"
+                  value={masterKey}
+                  onChange={(e) => setMasterKey(e.target.value)}
+                  className="w-full px-4 py-3 border-stone-100 bg-stone-50 rounded-xl text-sm font-bold text-[#131c3f] focus-visible:ring-orange-500/20 focus-visible:border-orange-500 placeholder:text-gray-300"
+                  placeholder="••••••••••••••••"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-stone-50">
+                <Label htmlFor="newPassInput" className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block ml-0.5">
+                  New Admin Password
+                </Label>
+                <Input
+                  id="newPassInput"
+                  type="password"
+                  value={newPassInput}
+                  onChange={(e) => setNewPassInput(e.target.value)}
+                  className="w-full px-4 py-3 border-stone-100 bg-stone-50 rounded-xl text-sm font-bold text-[#131c3f] focus-visible:ring-orange-500/20 focus-visible:border-orange-500 placeholder:text-gray-300"
+                  placeholder="Minimum 4 characters"
+                  required
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="px-6 py-4 bg-stone-50 border-t border-stone-100 sm:justify-center">
+              <Button
+                type="submit"
+                disabled={resetLoading || resetSuccess}
+                className="w-full sm:w-64 bg-[#131c3f] hover:bg-black text-white py-6 rounded-xl font-black uppercase tracking-widest text-[11px] shadow-lg disabled:opacity-50"
+              >
+                {resetLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirm New Password'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
