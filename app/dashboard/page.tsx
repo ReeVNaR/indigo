@@ -198,6 +198,7 @@ export default function Dashboard() {
     const [isSavingSettings, setIsSavingSettings] = useState(false);
     const currencySymbol = '₹';
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [adminAuthForm, setAdminAuthForm] = useState({ email: '', password: '' });
 
     // -- History-aware tab navigation --
     const isPopstateRef = useRef(false);
@@ -275,6 +276,13 @@ export default function Dashboard() {
                 const customersRes = await fetch('/api/customers');
                 if (!customersRes.ok) throw new Error('Failed to fetch customers');
                 const customersData = await customersRes.json();
+
+                // Fetch Admin Auth
+                const adminRes = await fetch('/api/auth/admin');
+                if (adminRes.ok) {
+                    const adminData = await adminRes.json();
+                    setAdminAuthForm(p => ({ ...p, email: adminData.email }));
+                }
 
                 setOrders(formattedOrders);
                 setCustomers(customersData || []);
@@ -378,11 +386,26 @@ export default function Dashboard() {
     const handleSaveSettings = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSavingSettings(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setIsSavingSettings(false);
-        // Could add toast notification here
-        alert("Settings saved successfully!");
+        try {
+            // Save admin auth if provided
+            if (adminAuthForm.email || adminAuthForm.password) {
+                await fetch('/api/auth/admin', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(adminAuthForm)
+                });
+            }
+
+            // Simulate Shop Profile API call (since it currently just uses local state)
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            setIsSavingSettings(false);
+            alert("Settings saved successfully!");
+        } catch (error) {
+            console.error("Save settings error:", error);
+            alert("Failed to save some settings.");
+            setIsSavingSettings(false);
+        }
     };
 
     const deleteOrder = async (id: string) => {
@@ -1469,6 +1492,45 @@ export default function Dashboard() {
                                                         <div>
                                                             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Phone Number</label>
                                                             <input type="tel" value={settingsForm.phone} onChange={e => setSettingsForm({ ...settingsForm, phone: e.target.value })} className="w-full px-4 py-3 border border-stone-200 text-[13px] rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none text-gray-900 font-bold transition-all bg-stone-50 focus:bg-white" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Login Security Card */}
+                                            <div className="bg-white rounded-xl shadow-sm border border-stone-100 relative overflow-hidden flex-1">
+                                                <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                                                <div className="p-8">
+                                                    <div className="flex items-center mb-8">
+                                                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 mr-4">
+                                                            <Settings className="w-6 h-6" />
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Login Security</h3>
+                                                            <p className="text-sm text-gray-500 font-medium">Update your administrative credentials.</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-6">
+                                                        <div>
+                                                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Admin Email</label>
+                                                            <input
+                                                                type="email"
+                                                                value={adminAuthForm.email}
+                                                                onChange={e => setAdminAuthForm({ ...adminAuthForm, email: e.target.value })}
+                                                                className="w-full px-4 py-3 border border-stone-200 text-[13px] rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-gray-900 font-bold transition-all bg-stone-50 focus:bg-white"
+                                                                placeholder="admin@example.com"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">New Password (Leave blank to keep current)</label>
+                                                            <input
+                                                                type="password"
+                                                                value={adminAuthForm.password}
+                                                                onChange={e => setAdminAuthForm({ ...adminAuthForm, password: e.target.value })}
+                                                                className="w-full px-4 py-3 border border-stone-200 text-[13px] rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-gray-900 font-bold transition-all bg-stone-50 focus:bg-white"
+                                                                placeholder="Enter new password"
+                                                            />
                                                         </div>
                                                     </div>
                                                 </div>

@@ -67,8 +67,23 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // --- Database-Backed Auth ---
+        let adminEmail = ADMIN_EMAIL;
+        let adminPassword = ADMIN_PASSWORD;
+
+        try {
+            const { getAdminUser } = await import('@/lib/users');
+            const dbAdmin = await getAdminUser();
+            if (dbAdmin) {
+                adminEmail = dbAdmin.email;
+                adminPassword = dbAdmin.password;
+            }
+        } catch (e) {
+            console.error("Auth DB Error:", e);
+        }
+
         // Validate credentials
-        if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+        if (email !== adminEmail || password !== adminPassword) {
             return NextResponse.json(
                 { error: 'Invalid email or password' },
                 { status: 401 }
