@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { isAuthenticated } from '@/lib/auth';
 
 const DB_NAME = 'indigo';
 const COLLECTION_NAME = 'expenses';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    if (!isAuthenticated(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const client = await clientPromise;
         const db = client.db(DB_NAME);
@@ -24,6 +29,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+    if (!isAuthenticated(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const client = await clientPromise;
         const db = client.db(DB_NAME);
@@ -45,6 +54,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    if (!isAuthenticated(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { searchParams } = new URL(req.url);
         const id = searchParams.get('id');

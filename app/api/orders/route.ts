@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { isAuthenticated } from '@/lib/auth';
 
 const DB_NAME = 'indigo';
 const COLLECTION_NAME = 'orders';
 
-export async function GET() {
-    console.log('API: GET /api/orders called');
+export async function GET(req: NextRequest) {
+    if (!isAuthenticated(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
     try {
-        console.log('API: Awaiting clientPromise...');
         const client = await clientPromise;
-        console.log('API: Connected to MongoDB');
         const db = client.db(DB_NAME);
         const orders = await db.collection(COLLECTION_NAME).find({}).sort({ created_at: -1 }).toArray();
-        console.log(`API: Found ${orders.length} orders`);
 
         // Transform MongoDB _id to id for the frontend
         const formattedOrders = orders.map(order => ({
@@ -29,6 +30,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+    if (!isAuthenticated(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const client = await clientPromise;
         const db = client.db(DB_NAME);
@@ -48,6 +53,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+    if (!isAuthenticated(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const client = await clientPromise;
         const db = client.db(DB_NAME);
@@ -74,6 +83,10 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    if (!isAuthenticated(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { searchParams } = new URL(req.url);
         const id = searchParams.get('id');
