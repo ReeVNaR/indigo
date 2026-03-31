@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -74,6 +74,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
     const [customCategory, setCustomCategory] = useState<'top' | 'bottom'>('top');
     const [isAddingExtraField, setIsAddingExtraField] = useState(false);
     const [newFieldName, setNewFieldName] = useState('');
+    const suggestionsRef = useRef<HTMLDivElement>(null);
 
     // Reset when closed
     useEffect(() => {
@@ -106,6 +107,18 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
     useEffect(() => {
         setFocusedSuggestionIndex(-1);
     }, [filteredCustomers]);
+
+    // Auto-scroll focused suggestion into view
+    useEffect(() => {
+        if (focusedSuggestionIndex >= 0 && suggestionsRef.current) {
+            const container = suggestionsRef.current;
+            const items = container.querySelectorAll('[data-suggestion-item]');
+            const focusedItem = items[focusedSuggestionIndex] as HTMLElement;
+            if (focusedItem) {
+                focusedItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+    }, [focusedSuggestionIndex]);
 
     const totalAmount = useMemo(() => {
         return newOrderForm.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
@@ -182,7 +195,8 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
             if (!showCustomerSuggestions || !customerSearchQuery) return;
 
             const suggestionsCount = filteredCustomers.length;
-            const totalOptions = suggestionsCount > 0 ? suggestionsCount : 1;
+            // Total options = all customers + the "Create new" button at the end
+            const totalOptions = suggestionsCount + 1;
 
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -191,24 +205,22 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                 e.preventDefault();
                 setFocusedSuggestionIndex(prev => (prev > 0 ? prev - 1 : totalOptions - 1));
             } else if (e.key === 'Enter') {
+                e.preventDefault();
                 if (focusedSuggestionIndex === -1 && suggestionsCount === 1) {
                     handleSelectCustomer(filteredCustomers[0]);
                     return;
                 }
 
-                if (focusedSuggestionIndex >= 0 && focusedSuggestionIndex < totalOptions) {
-                    e.preventDefault();
-                    if (suggestionsCount > 0) {
-                        handleSelectCustomer(filteredCustomers[focusedSuggestionIndex]);
-                    } else {
-                        handleCreateNewCustomerParams();
-                    }
-                } else if (suggestionsCount === 0) {
-                    e.preventDefault();
+                if (focusedSuggestionIndex >= 0 && focusedSuggestionIndex < suggestionsCount) {
+                    // Selected an existing customer
+                    handleSelectCustomer(filteredCustomers[focusedSuggestionIndex]);
+                } else {
+                    // Selected "Create new" (last item or no results)
                     handleCreateNewCustomerParams();
                 }
             } else if (e.key === 'Escape') {
                 setShowCustomerSuggestions(false);
+                setFocusedSuggestionIndex(-1);
             }
         }
     };
@@ -398,51 +410,64 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                         <input
                             autoFocus
                             type="text"
+                            role="combobox"
+                            aria-expanded={showCustomerSuggestions && !!customerSearchQuery}
+                            aria-haspopup="listbox"
+                            aria-autocomplete="list"
+                            aria-activedescendant={focusedSuggestionIndex >= 0 ? `suggestion-${focusedSuggestionIndex}` : undefined}
                             placeholder="Find or add customer..."
                             value={customerSearchQuery}
                             onChange={e => { setCustomerSearchQuery(e.target.value); setShowCustomerSuggestions(true); }}
-                            onKeyDown={handleKeyDown}
                             className="w-full pl-12 pr-5 py-4 bg-white border-2 border-stone-100 rounded-xl text-lg font-medium text-[#131c3f] outline-none focus:border-amber-400 focus:ring-8 focus:ring-amber-400/5 transition-all shadow-sm"
                         />
                     </div>
 
                     {showCustomerSuggestions && customerSearchQuery && (
-                        <div className="absolute top-full left-0 right-0 mt-3 bg-white border border-stone-100 rounded-2xl shadow-2xl z-20 overflow-hidden max-h-72 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
-                            {filteredCustomers.length > 0 ? (
-                                filteredCustomers.map((c, idx) => (
-                                    <button
-                                        key={c.id}
-                                        onClick={() => handleSelectCustomer(c)}
-                                        onMouseEnter={() => setFocusedSuggestionIndex(idx)}
-                                        className={`w-full px-6 py-4 text-left flex items-center justify-between transition-colors border-b border-stone-50 last:border-none group ${focusedSuggestionIndex === idx ? 'bg-amber-50' : 'hover:bg-slate-50'}`}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black transition-colors ${focusedSuggestionIndex === idx ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500 group-hover:bg-amber-100 group-hover:text-amber-600'}`}>
-                                                {c.name.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <p className="text-base font-bold text-[#131c3f]">{c.name}</p>
-                                                <p className="text-xs text-slate-500 font-medium">{c.phone || 'No phone'}</p>
-                                            </div>
-                                        </div>
-                                        <ChevronRight className={`w-5 h-5 transition-colors ${focusedSuggestionIndex === idx ? 'text-amber-500 translate-x-1' : 'text-slate-400 group-hover:text-amber-500 group-hover:translate-x-1'}`} />
-                                    </button>
-                                ))
-                            ) : (
+                        <div
+                            ref={suggestionsRef}
+                            role="listbox"
+                            aria-label="Customer suggestions"
+                            className="absolute top-full left-0 right-0 mt-3 bg-white border border-stone-100 rounded-2xl shadow-2xl z-20 overflow-hidden max-h-72 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200"
+                        >
+                            {filteredCustomers.map((c, idx) => (
                                 <button
-                                    onClick={handleCreateNewCustomerParams}
-                                    onMouseEnter={() => setFocusedSuggestionIndex(0)}
-                                    className={`w-full px-6 py-6 text-left flex items-center gap-4 group transition-colors ${focusedSuggestionIndex === 0 ? 'bg-amber-50' : 'hover:bg-amber-50'}`}
+                                    key={c.id}
+                                    role="option"
+                                    aria-selected={focusedSuggestionIndex === idx}
+                                    data-suggestion-item
+                                    onClick={() => handleSelectCustomer(c)}
+                                    onMouseEnter={() => setFocusedSuggestionIndex(idx)}
+                                    className={`w-full px-6 py-4 text-left flex items-center justify-between transition-colors border-b border-stone-50 last:border-none group ${focusedSuggestionIndex === idx ? 'bg-amber-50' : 'hover:bg-slate-50'}`}
                                 >
-                                    <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center border-2 border-amber-200/50">
-                                        <Plus className="w-6 h-6" />
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black transition-colors ${focusedSuggestionIndex === idx ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500 group-hover:bg-amber-100 group-hover:text-amber-600'}`}>
+                                            {c.name.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <p className="text-base font-bold text-[#131c3f]">{c.name}</p>
+                                            <p className="text-xs text-slate-500 font-medium">{c.phone || 'No phone'}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-base font-black text-amber-700 uppercase tracking-tight">Create &quot;{customerSearchQuery}&quot;</p>
-                                        <p className="text-xs text-amber-500 font-bold uppercase tracking-widest mt-0.5">Add new customer to database</p>
-                                    </div>
+                                    <ChevronRight className={`w-5 h-5 transition-all duration-200 ${focusedSuggestionIndex === idx ? 'text-amber-500 translate-x-1' : 'text-slate-400 group-hover:text-amber-500 group-hover:translate-x-1'}`} />
                                 </button>
-                            )}
+                            ))}
+                            {/* Always show "Create new" as the last keyboard-navigable option */}
+                            <button
+                                role="option"
+                                aria-selected={focusedSuggestionIndex === filteredCustomers.length}
+                                data-suggestion-item
+                                onClick={handleCreateNewCustomerParams}
+                                onMouseEnter={() => setFocusedSuggestionIndex(filteredCustomers.length)}
+                                className={`w-full px-6 py-5 text-left flex items-center gap-4 group transition-colors border-t border-stone-100 ${focusedSuggestionIndex === filteredCustomers.length ? 'bg-amber-50' : 'hover:bg-amber-50'}`}
+                            >
+                                <div className={`w-11 h-11 rounded-full flex items-center justify-center border-2 transition-colors ${focusedSuggestionIndex === filteredCustomers.length ? 'bg-amber-200 text-amber-700 border-amber-300' : 'bg-amber-100 text-amber-600 border-amber-200/50'}`}>
+                                    <Plus className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <p className="text-base font-black text-amber-700 uppercase tracking-tight">Create &quot;{customerSearchQuery}&quot;</p>
+                                    <p className="text-xs text-amber-500 font-bold uppercase tracking-widest mt-0.5">Add new customer to database</p>
+                                </div>
+                            </button>
                         </div>
                     )}
                 </div>
@@ -970,7 +995,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                     ...prev,
                                                                     measurements: {
                                                                         ...prev.measurements,
-                                                                        [type!]: { ...((prev.measurements?.[type as any] as any) || {}), [field]: '' }
+                                                                        [type as string]: { ...(((prev.measurements as any)?.[type as string]) || {}), [field]: '' }
                                                                     }
                                                                 }));
                                                                 setNewFieldName('');
@@ -988,7 +1013,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                     ...prev,
                                                                     measurements: {
                                                                         ...prev.measurements,
-                                                                        [type!]: { ...((prev.measurements?.[type as any] as any) || {}), [field]: '' }
+                                                                        [type as string]: { ...(((prev.measurements as any)?.[type as string]) || {}), [field]: '' }
                                                                     }
                                                                 }));
                                                                 setNewFieldName('');
