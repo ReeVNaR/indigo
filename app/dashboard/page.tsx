@@ -59,6 +59,18 @@ import NewOrderForm from '@/components/dashboard/NewOrderForm';
 import ReportsView from '@/components/dashboard/ReportsView';
 import FinanceView from '@/components/dashboard/FinanceView';
 import { Order, Customer, OrderStatus } from '@/lib/types';
+import {
+    getEnabledOptionalMeasurementFields,
+    formatMeasurementLabel,
+    getExtraMeasurementFields,
+    getMeasurementFieldRows,
+    getMeasurementNotes,
+    getMeasurementValue,
+    isMeasurementComplete,
+    measurementBaseFields,
+    measurementOptionalFields,
+    getVisibleMeasurementFields,
+} from '@/lib/measurement-layout';
 
 // --- Icons & Helpers ---
 const SidebarIcon = ({ name, active }: { name: string; active?: boolean }) => {
@@ -93,6 +105,11 @@ const ArrowRightIcon = () => (
     </svg>
 );
 
+const formatMeasurementValue = (value: any) => {
+    if (value === undefined || value === null || String(value).trim() === '') return '--';
+    return `${value}"`;
+};
+
 // --- Sidebar Content ---
 const SidebarContent = ({ activeTab, setActiveTab, onLogout, shopName, masterTailor }: { activeTab: string, setActiveTab: (id: string) => void, onLogout: () => void, shopName: string, masterTailor: string }) => {
     const shopNameParts = shopName.split(' ');
@@ -122,8 +139,8 @@ const SidebarContent = ({ activeTab, setActiveTab, onLogout, shopName, masterTai
             {/* Nav */}
             <nav className="flex-1 py-6 space-y-1 px-3">
                 {[
-                    { name: 'Dashboard', id: 'dashboard' },
                     { name: 'Customers', id: 'customers' },
+                    { name: 'Dashboard', id: 'dashboard' },
                     { name: 'Orders', id: 'orders' },
                     { name: 'Reports', id: 'reports' },
                     { name: 'Finance', id: 'finance' },
@@ -161,9 +178,10 @@ const SidebarContent = ({ activeTab, setActiveTab, onLogout, shopName, masterTai
 
 export default function Dashboard() {
     const router = useRouter();
-    const [activeTab, setActiveTabRaw] = useState('dashboard');
+    const [activeTab, setActiveTabRaw] = useState('customers');
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [activeProfileTab, setActiveProfileTab] = useState<'measures' | 'history' | 'report'>('measures');
+    const [viewingMeasurementGarment, setViewingMeasurementGarment] = useState<any | null>(null);
     const [editingMeasurementGarment, setEditingMeasurementGarment] = useState<'shirt' | 'pant' | 'kurta' | 'suit' | 'vest' | 'custom' | null>(null);
     const [editingCustomGarmentId, setEditingCustomGarmentId] = useState<string | null>(null);
     const [customGarmentName, setCustomGarmentName] = useState<string>('');
@@ -187,6 +205,15 @@ export default function Dashboard() {
     const [newFieldName, setNewFieldName] = useState('');
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online' | 'Card'>('Cash');
+    const [customerLedgerForm, setCustomerLedgerForm] = useState({
+        date: '',
+        particular: '',
+        totalAmount: '',
+        advancePaid: ''
+    });
+    const [editingCustomerLedgerId, setEditingCustomerLedgerId] = useState<string | null>(null);
+    const [isSavingCustomerLedger, setIsSavingCustomerLedger] = useState(false);
+    const [customerLedgerDeleteTarget, setCustomerLedgerDeleteTarget] = useState<{ customerId: string; entryId: string; particular: string } | null>(null);
 
     const [settingsForm, setSettingsForm] = useState({
         shopName: 'Dadashri Designers',
@@ -196,7 +223,7 @@ export default function Dashboard() {
         notifications: true
     });
     const [isSavingSettings, setIsSavingSettings] = useState(false);
-    const currencySymbol = '₹';
+    const currencySymbol = 'Rs. ';
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [adminAuthForm, setAdminAuthForm] = useState({ email: '', password: '' });
 
@@ -222,7 +249,7 @@ export default function Dashboard() {
                 activeTabRef.current = e.state.tab;
                 isPopstateRef.current = false;
             } else {
-                // We'd leave the dashboard — push forward to stay
+                // We'd leave the dashboard ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â push forward to stay
                 window.history.pushState({ tab: activeTabRef.current }, '', '/dashboard');
             }
         };
@@ -527,6 +554,103 @@ export default function Dashboard() {
         }
     };
 
+    const resetCustomerLedgerForm = () => {
+        setCustomerLedgerForm({
+            date: '',
+            particular: '',
+            totalAmount: '',
+            advancePaid: ''
+        });
+        setEditingCustomerLedgerId(null);
+    };
+
+    const handleSaveCustomerLedgerEntry = async (customer: Customer) => {
+        const totalAmount = Number(customerLedgerForm.totalAmount);
+        const advancePaid = Number(customerLedgerForm.advancePaid);
+
+        if (!customerLedgerForm.date || !customerLedgerForm.particular.trim() || Number.isNaN(totalAmount) || Number.isNaN(advancePaid)) {
+            alert('Please fill date, particular, total amount, and advance paid.');
+            return;
+        }
+
+        if (totalAmount < 0 || advancePaid < 0) {
+            alert('Amounts cannot be negative.');
+            return;
+        }
+
+        try {
+            setIsSavingCustomerLedger(true);
+            const ledgerEntries = [...(customer.ledgerEntries || [])];
+            const nextEntry = {
+                id: editingCustomerLedgerId || Math.random().toString(36).slice(2, 11),
+                date: customerLedgerForm.date,
+                particular: customerLedgerForm.particular.trim(),
+                totalAmount,
+                advancePaid,
+            };
+
+            const existingIndex = ledgerEntries.findIndex((entry) => entry.id === nextEntry.id);
+            if (existingIndex >= 0) ledgerEntries[existingIndex] = nextEntry;
+            else ledgerEntries.unshift(nextEntry);
+
+            const res = await fetch('/api/customers', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: customer.id,
+                    ledgerEntries,
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to save ledger entry');
+
+            setCustomers((prev) => prev.map((current) =>
+                current.id === customer.id ? { ...current, ledgerEntries } : current
+            ));
+            resetCustomerLedgerForm();
+        } catch (error) {
+            console.error('Error saving customer ledger entry:', error);
+            alert('Failed to save customer ledger entry.');
+        } finally {
+            setIsSavingCustomerLedger(false);
+        }
+    };
+
+    const handleEditCustomerLedgerEntry = (entry: NonNullable<Customer['ledgerEntries']>[number]) => {
+        setEditingCustomerLedgerId(entry.id);
+        setCustomerLedgerForm({
+            date: entry.date,
+            particular: entry.particular,
+            totalAmount: String(entry.totalAmount),
+            advancePaid: String(entry.advancePaid),
+        });
+    };
+
+    const handleDeleteCustomerLedgerEntry = async (customer: Customer, entryId: string) => {
+        try {
+            const ledgerEntries = (customer.ledgerEntries || []).filter((entry) => entry.id !== entryId);
+            const res = await fetch('/api/customers', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: customer.id,
+                    ledgerEntries,
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to delete ledger entry');
+
+            setCustomers((prev) => prev.map((current) =>
+                current.id === customer.id ? { ...current, ledgerEntries } : current
+            ));
+            if (editingCustomerLedgerId === entryId) resetCustomerLedgerForm();
+            setCustomerLedgerDeleteTarget(null);
+        } catch (error) {
+            console.error('Error deleting customer ledger entry:', error);
+            alert('Failed to delete customer ledger entry.');
+        }
+    };
+
     const handleSaveMeasurements = async () => {
         if (!selectedCustomerId || !editingMeasurementGarment) return;
         try {
@@ -693,7 +817,7 @@ export default function Dashboard() {
                                                 const totalPaid = (order.advancePaid || 0) + (order.payments || []).reduce((sum, p) => sum + p.amount, 0);
                                                 const due = order.amount - totalPaid;
                                                 if (due <= 0) return <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-tighter">Fully Paid</span>;
-                                                if (totalPaid > 0) return <span className="text-[8px] font-bold text-blue-500 uppercase tracking-tighter">Partial (Due: ₹{due.toLocaleString()})</span>;
+                                                if (totalPaid > 0) return <span className="text-[8px] font-bold text-blue-500 uppercase tracking-tighter">Partial (Due: ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{due.toLocaleString()})</span>;
                                                 return <span className="text-[8px] font-bold text-red-400 uppercase tracking-tighter">Unpaid</span>;
                                             })()}
                                         </div>
@@ -861,7 +985,7 @@ export default function Dashboard() {
                                         { label: 'Total Orders', val: orders.length.toString(), sub: `+${orders.filter(o => o.orderDate?.split('T')[0] === new Date().toISOString().split('T')[0]).length}`, subText: 'new today', subColor: 'text-emerald-500 font-bold', iconType: 'orders', action: () => { setStatusFilter('All'); setDeliveryFilter('All'); setActiveTab('orders'); } },
                                         { label: 'Active Orders', val: activeOrdersCount.toString(), sub: `! ${urgentOrdersCount} Urgent`, subText: 'pending', subColor: 'text-orange-500 font-bold', iconType: 'orders', action: () => { setStatusFilter('Active'); setDeliveryFilter('All'); setActiveTab('orders'); } },
                                         {
-                                            label: "Today's Deliveries", val: completedToday.toString(), sub: '🕒 Pending', subText: orders.filter(o => {
+                                            label: "Today's Deliveries", val: completedToday.toString(), sub: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Â¢Ã¢â‚¬â„¢ Pending', subText: orders.filter(o => {
                                                 const today = new Date().toISOString().split('T')[0];
                                                 return o.deliveryDate === today && o.status !== 'Completed';
                                             }).length.toString(), subColor: 'text-slate-500', iconType: 'delivery', action: () => { setStatusFilter('All'); setDeliveryFilter('Today'); setActiveTab('orders'); }
@@ -999,7 +1123,7 @@ export default function Dashboard() {
                                                         return (
                                                             <div className="mt-3 text-[10px] flex justify-between items-center bg-stone-50 p-2 rounded border border-stone-100/50">
                                                                 <span className="font-bold text-gray-500 uppercase">{custOrders.length || c.ordersCount} Total Orders</span>
-                                                                <span className="text-orange-600 font-black">₹{(realSpent || c.totalSpent).toLocaleString()} spent</span>
+                                                                <span className="text-orange-600 font-black">{currencySymbol}{(realSpent || c.totalSpent).toLocaleString()} spent</span>
                                                             </div>
                                                         );
                                                     })()}
@@ -1123,47 +1247,65 @@ export default function Dashboard() {
                                                             {
                                                                 type: 'shirt',
                                                                 label: 'Shirt',
-                                                                fields: ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'],
+                                                                fields: measurementBaseFields.shirt,
+                                                                optionalFields: measurementOptionalFields.shirt,
                                                                 data: customer.measurements?.shirt
                                                             },
                                                             {
                                                                 type: 'pant',
                                                                 label: 'Pant',
-                                                                fields: ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'],
+                                                                fields: measurementBaseFields.pant,
+                                                                optionalFields: measurementOptionalFields.pant,
                                                                 data: customer.measurements?.pant
                                                             },
                                                             {
                                                                 type: 'kurta',
                                                                 label: 'Kurta',
-                                                                fields: ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'],
+                                                                fields: measurementBaseFields.kurta,
+                                                                optionalFields: measurementOptionalFields.kurta,
                                                                 data: customer.measurements?.kurta
                                                             },
                                                             {
                                                                 type: 'suit',
                                                                 label: 'Suit / Coat',
-                                                                fields: ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck'],
+                                                                fields: measurementBaseFields.suit,
+                                                                optionalFields: measurementOptionalFields.suit,
                                                                 data: customer.measurements?.suit
                                                             },
                                                             {
                                                                 type: 'vest',
                                                                 label: 'Vest / Waistcoat',
-                                                                fields: ['length', 'chest', 'waist'],
+                                                                fields: measurementBaseFields.vest,
+                                                                optionalFields: measurementOptionalFields.vest,
                                                                 data: customer.measurements?.vest
                                                             },
                                                             ...(customer.measurements?.customItems || []).map(item => ({
                                                                 type: 'custom' as any,
                                                                 customId: item.id,
                                                                 label: item.name,
-                                                                fields: (item.category === 'bottom') ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] : ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'],
+                                                                fields: item.category === 'bottom' ? measurementBaseFields.customBottom : measurementBaseFields.customTop,
+                                                                optionalFields: item.category === 'bottom' ? measurementOptionalFields.customBottom : measurementOptionalFields.customTop,
                                                                 data: item.measurements,
                                                                 category: item.category,
                                                                 lastUpdated: item.lastUpdated
                                                             }))
-                                                        ].map((garment: any, idx) => (
-                                                            <Card key={garment.customId || garment.type} className="border-stone-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                                        ].map((garment: any) => (
+                                                            <Card
+                                                                key={garment.customId || garment.type}
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                onClick={() => setViewingMeasurementGarment(garment)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                                        e.preventDefault();
+                                                                        setViewingMeasurementGarment(garment);
+                                                                    }
+                                                                }}
+                                                                className="border-stone-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-300"
+                                                            >
                                                                 <div className="px-4 py-3 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
                                                                     <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">{garment.label}</span>
-                                                                    {garment.data ? (
+                                                                    {garment.data && isMeasurementComplete(garment.fields || [], garment.data) ? (
                                                                         <span className="text-[9px] font-bold text-emerald-600 uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Saved</span>
                                                                     ) : (
                                                                         <span className="text-[9px] font-bold text-amber-600 uppercase bg-amber-50 px-2 py-0.5 rounded border border-amber-100">Pending</span>
@@ -1171,31 +1313,74 @@ export default function Dashboard() {
                                                                 </div>
                                                                 <CardContent className="p-4">
                                                                     <div className="space-y-1.5 min-h-[160px]">
-                                                                        {garment.fields.map((field: string) => (
-                                                                            <div key={field} className="flex justify-between border-b border-stone-100/50 pb-1 last:border-none">
-                                                                                <span className="text-[10px] font-bold text-gray-400 capitalize">{field}</span>
-                                                                                <span className="text-xs font-black text-gray-700">{garment.data?.[field] || '—'}&quot;</span>
-                                                                            </div>
+                                                                        {getMeasurementFieldRows(getVisibleMeasurementFields(garment.fields || [], garment.data, garment.optionalFields || []), garment.data).map((row: string[]) => (
+                                                                            (() => {
+                                                                                return (
+                                                                                    <div
+                                                                                        key={row.join('|')}
+                                                                                        className={`border-b border-stone-100/50 pb-1 last:border-none ${
+                                                                                            row.length === 3
+                                                                                                ? 'grid grid-cols-3 gap-2'
+                                                                                                : row.length === 2
+                                                                                                    ? 'grid grid-cols-2 gap-2'
+                                                                                                    : 'grid grid-cols-1'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {row.map((field) => (
+                                                                                            <div key={field} className="flex min-w-0 items-center justify-between gap-2">
+                                                                                                <span className="truncate whitespace-nowrap text-[10px] font-bold text-gray-400">
+                                                                                                    {formatMeasurementLabel(field)}
+                                                                                                </span>
+                                                                                                <span className="shrink-0 whitespace-nowrap text-xs font-black text-gray-700">
+                                                                                                    {formatMeasurementValue(getMeasurementValue(garment.data, field))}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                );
+                                                                            })()
                                                                         ))}
+                                                                        {getMeasurementNotes(garment.data).trim() && (
+                                                                            <div className="border-t border-stone-100/50 pt-2">
+                                                                                <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Notes</div>
+                                                                                <div className="mt-1 text-[10px] font-medium leading-4 text-gray-600 whitespace-pre-wrap">
+                                                                                    {getMeasurementNotes(garment.data)}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                    <div className="mt-4 pt-3 border-t border-stone-100 flex justify-between items-center">
+                                                                    <div className="mt-4 pt-3 border-t border-stone-100 flex justify-between items-center gap-2">
                                                                         <span className="text-[8px] font-bold text-gray-300 uppercase">
                                                                             {garment.lastUpdated ? `Updated: ${garment.lastUpdated}` : garment.data?.lastUpdated ? `Updated: ${garment.data.lastUpdated}` : 'No updates'}
                                                                         </span>
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            onClick={() => {
-                                                                                setEditingMeasurementGarment(garment.type as any);
-                                                                                setEditingCustomGarmentId(garment.customId || null);
-                                                                                setCustomGarmentName(garment.customId ? garment.label : '');
-                                                                                setCustomCategory(garment.category || 'top');
-                                                                                setMeasurementForm(garment.data || {});
-                                                                            }}
-                                                                            className="h-7 px-3 text-[10px] font-black uppercase tracking-widest border-stone-200 hover:bg-stone-50"
-                                                                        >
-                                                                            Edit
-                                                                        </Button>
+                                                                        <div className="flex items-center gap-2 shrink-0">
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setViewingMeasurementGarment(garment);
+                                                                                }}
+                                                                                className="h-7 px-3 text-[10px] font-black uppercase tracking-widest border-stone-200 hover:bg-stone-50"
+                                                                            >
+                                                                                View
+                                                                            </Button>
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setEditingMeasurementGarment(garment.type as any);
+                                                                                    setEditingCustomGarmentId(garment.customId || null);
+                                                                                    setCustomGarmentName(garment.customId ? garment.label : '');
+                                                                                    setCustomCategory(garment.category || 'top');
+                                                                                    setMeasurementForm(garment.data || {});
+                                                                                }}
+                                                                                className="h-7 px-3 text-[10px] font-black uppercase tracking-widest border-stone-200 hover:bg-stone-50"
+                                                                            >
+                                                                                Edit
+                                                                            </Button>
+                                                                        </div>
                                                                     </div>
                                                                 </CardContent>
                                                             </Card>
@@ -1245,25 +1430,25 @@ export default function Dashboard() {
                                                                         <div key={o.id} className="px-4 py-3 border-b border-stone-50 last:border-none hover:bg-stone-50/50 transition-colors">
                                                                             {/* Desktop: grid row */}
                                                                             <div className="hidden sm:grid grid-cols-12 gap-2">
-                                                                                <div className="col-span-3 text-[10px] font-bold text-gray-400">{o.orderDate || '—'}</div>
-                                                                                <div className="col-span-3 text-[10px] font-black text-gray-700 uppercase">{o.clothType || '—'}</div>
+                                                                                <div className="col-span-3 text-[10px] font-bold text-gray-400">{o.orderDate || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</div>
+                                                                                <div className="col-span-3 text-[10px] font-black text-gray-700 uppercase">{o.clothType || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</div>
                                                                                 <div className="col-span-2 text-[10px] font-bold text-gray-500">{o.deliveryDate}</div>
-                                                                                <div className="col-span-2 text-xs font-black text-gray-900 text-right">₹{o.amount.toLocaleString()}</div>
+                                                                                <div className="col-span-2 text-xs font-black text-gray-900 text-right">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{o.amount.toLocaleString()}</div>
                                                                                 <div className="col-span-2 text-right">
                                                                                     <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                                                                         o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
                                                                                             'bg-amber-50 text-amber-600 border border-amber-100'
                                                                                         }`}>{o.status}</span>
-                                                                                </div>
+                                                                                        </div>
                                                                             </div>
                                                                             {/* Mobile: stacked card */}
                                                                             <div className="sm:hidden flex justify-between items-start gap-2">
                                                                                 <div className="flex-1 min-w-0">
-                                                                                    <p className="text-[11px] font-black text-gray-700 uppercase truncate">{o.clothType || '—'}</p>
-                                                                                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">{o.orderDate || '—'} → {o.deliveryDate}</p>
+                                                                                    <p className="text-[11px] font-black text-gray-700 uppercase truncate">{o.clothType || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</p>
+                                                                                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">{o.orderDate || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ {o.deliveryDate}</p>
                                                                                 </div>
                                                                                 <div className="text-right shrink-0">
-                                                                                    <p className="text-xs font-black text-gray-900">₹{o.amount.toLocaleString()}</p>
+                                                                                    <p className="text-xs font-black text-gray-900">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{o.amount.toLocaleString()}</p>
                                                                                     <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded inline-block mt-0.5 ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                                                                         o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
                                                                                             'bg-amber-50 text-amber-600 border border-amber-100'
@@ -1303,140 +1488,125 @@ export default function Dashboard() {
                                                 })()}
 
                                                 {activeProfileTab === 'report' && (() => {
-                                                    const customerOrders = orders.filter(o => o.customerName === customer.name);
-                                                    const totalSpent = customerOrders.reduce((s, o) => s + o.amount, 0);
-                                                    const totalPaid = customerOrders.reduce((s, o) => {
-                                                        const paid = (o.advancePaid || 0) + (o.payments || []).reduce((ps: number, p: any) => ps + p.amount, 0);
-                                                        return s + paid;
-                                                    }, 0);
-                                                    const totalDue = totalSpent - totalPaid;
-                                                    const completedOrders = customerOrders.filter(o => o.status === 'Completed');
-                                                    const activeOrders = customerOrders.filter(o => o.status !== 'Completed');
-                                                    const today = new Date();
-                                                    const overdueOrders = customerOrders.filter(o => o.status !== 'Completed' && new Date(o.deliveryDate) < today);
-                                                    const garmentTypes = [...new Set(customerOrders.flatMap(o => o.clothType.split(', ').map(s => s.trim())))];
-                                                    const hasMeasurements = ['shirt', 'pant', 'kurta', 'suit', 'vest'].filter(g => (customer.measurements as any)?.[g]);
-                                                    const firstOrder = customerOrders.slice().sort((a, b) => new Date(a.orderDate || '').getTime() - new Date(b.orderDate || '').getTime())[0];
-                                                    const lastOrder = customerOrders.slice().sort((a, b) => new Date(b.orderDate || '').getTime() - new Date(a.orderDate || '').getTime())[0];
+                                                    const ledgerEntries = [...(customer.ledgerEntries || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                                                    const pendingEntries = ledgerEntries.filter((entry) => entry.totalAmount - entry.advancePaid > 0);
+                                                    const totalPendingAmount = pendingEntries.reduce((sum, entry) => sum + (entry.totalAmount - entry.advancePaid), 0);
 
                                                     return (
-                                                        <div className="space-y-6">
-
-                                                            {/* Stats Row */}
-                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                                {[
-                                                                    { label: 'Total Orders', value: customerOrders.length, sub: `${completedOrders.length} completed`, color: 'bg-stone-50 border-stone-200' },
-                                                                    { label: 'Total Billed', value: `₹${totalSpent.toLocaleString()}`, sub: `₹${totalPaid.toLocaleString()} received`, color: 'bg-emerald-50/50 border-emerald-100' },
-                                                                    { label: 'Amount Due', value: `₹${totalDue.toLocaleString()}`, sub: totalDue > 0 ? 'Outstanding balance' : 'Fully settled', color: totalDue > 0 ? 'bg-red-50/50 border-red-100' : 'bg-emerald-50/50 border-emerald-100' },
-                                                                    { label: 'Active Orders', value: activeOrders.length, sub: overdueOrders.length > 0 ? `${overdueOrders.length} overdue` : 'All on track', color: overdueOrders.length > 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-stone-50 border-stone-200' },
-                                                                ].map((stat, i) => (
-                                                                    <div key={i} className={`${stat.color} border rounded-xl p-4`}>
-                                                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">{stat.label}</p>
-                                                                        <p className="text-xl font-black text-gray-900">{stat.value}</p>
-                                                                        <p className="text-[9px] font-bold text-gray-400 mt-1">{stat.sub}</p>
+                                                        <div className="space-y-4">
+                                                            <div className="border border-stone-200 bg-white">
+                                                                <div className="border-b border-stone-200 px-4 py-3">
+                                                                    <div className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Total Pending Amount</div>
+                                                                    <div className={`mt-1 text-2xl font-black ${totalPendingAmount > 0 ? 'text-red-600' : 'text-stone-900'}`}>
+                                                                        Rs. {totalPendingAmount.toLocaleString()}
                                                                     </div>
-                                                                ))}
-                                                            </div>
-
-                                                            {/* Contact & Info */}
-                                                            <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
-                                                                <div className="px-4 py-3 bg-stone-50 border-b border-stone-100">
-                                                                    <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Contact Information</span>
                                                                 </div>
-                                                                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                                    {[
-                                                                        { label: 'Full Name', value: customer.name },
-                                                                        { label: 'Phone', value: customer.phone || '—' },
-                                                                        { label: 'Email', value: customer.email || '—' },
-                                                                        { label: 'Address', value: customer.address || '—' },
-                                                                        { label: 'First Order', value: firstOrder ? (firstOrder.orderDate || firstOrder.deliveryDate) : '—' },
-                                                                        { label: 'Last Order', value: lastOrder ? (lastOrder.orderDate || lastOrder.deliveryDate) : '—' },
-                                                                        { label: 'Garment Types Used', value: garmentTypes.length > 0 ? garmentTypes.join(', ') : '—' },
-                                                                        { label: 'Measurements Saved', value: hasMeasurements.length > 0 ? hasMeasurements.map(g => g.charAt(0).toUpperCase() + g.slice(1)).join(', ') : 'None' },
-                                                                    ].map((row, i) => (
-                                                                        <div key={i} className="flex flex-col gap-0.5">
-                                                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{row.label}</span>
-                                                                            <span className="text-xs font-bold text-gray-800">{row.value}</span>
+
+                                                                <div className="grid grid-cols-1 gap-3 border-b border-stone-200 px-4 py-3 md:grid-cols-[140px_minmax(0,1fr)_120px_120px_120px_140px]">
+                                                                    <input
+                                                                        type="date"
+                                                                        value={customerLedgerForm.date}
+                                                                        onChange={(e) => setCustomerLedgerForm((prev) => ({ ...prev, date: e.target.value }))}
+                                                                        className="border border-stone-200 px-2 py-2 text-sm outline-none"
+                                                                    />
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder="Particular / Garment"
+                                                                        value={customerLedgerForm.particular}
+                                                                        onChange={(e) => setCustomerLedgerForm((prev) => ({ ...prev, particular: e.target.value }))}
+                                                                        className="border border-stone-200 px-2 py-2 text-sm outline-none"
+                                                                    />
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        placeholder="Total"
+                                                                        value={customerLedgerForm.totalAmount}
+                                                                        onChange={(e) => setCustomerLedgerForm((prev) => ({ ...prev, totalAmount: e.target.value }))}
+                                                                        className="border border-stone-200 px-2 py-2 text-right text-sm outline-none"
+                                                                    />
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        placeholder="Advance"
+                                                                        value={customerLedgerForm.advancePaid}
+                                                                        onChange={(e) => setCustomerLedgerForm((prev) => ({ ...prev, advancePaid: e.target.value }))}
+                                                                        className="border border-stone-200 px-2 py-2 text-right text-sm outline-none"
+                                                                    />
+                                                                    <div className="flex items-center justify-end px-2 text-sm font-black text-red-600">
+                                                                        Rs. {Math.max(0, (Number(customerLedgerForm.totalAmount) || 0) - (Number(customerLedgerForm.advancePaid) || 0)).toLocaleString()}
+                                                                    </div>
+                                                                    <div className="flex gap-2">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleSaveCustomerLedgerEntry(customer)}
+                                                                            disabled={isSavingCustomerLedger}
+                                                                            className="border border-stone-300 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-stone-700 disabled:opacity-60"
+                                                                        >
+                                                                            {isSavingCustomerLedger ? 'Saving' : editingCustomerLedgerId ? 'Update Entry' : 'Add Entry'}
+                                                                        </button>
+                                                                        {editingCustomerLedgerId && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={resetCustomerLedgerForm}
+                                                                                className="border border-stone-300 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-stone-500"
+                                                                            >
+                                                                                Cancel
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                {pendingEntries.length > 0 ? (
+                                                                    <div>
+                                                                        <div className="grid grid-cols-[110px_minmax(0,1fr)_110px_110px_120px_120px] gap-3 border-b border-stone-200 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-stone-500">
+                                                                            <span>Date</span>
+                                                                            <span>Particular</span>
+                                                                            <span className="text-right">Total</span>
+                                                                            <span className="text-right">Advance</span>
+                                                                            <span className="text-right">Remaining</span>
+                                                                            <span className="text-right">Action</span>
                                                                         </div>
-                                                                    ))}
-                                                                    {customer.notes && (
-                                                                        <div className="md:col-span-2 flex flex-col gap-0.5">
-                                                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Notes</span>
-                                                                            <span className="text-xs font-medium text-amber-700 italic bg-amber-50 px-3 py-2 rounded border border-amber-100">{customer.notes}</span>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Orders Table */}
-                                                            {customerOrders.length > 0 && (
-                                                                <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
-                                                                    <div className="px-4 py-3 bg-stone-50 border-b border-stone-100 flex items-center justify-between">
-                                                                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">All Orders</span>
-                                                                        <span className="text-[9px] font-bold text-gray-400">{customerOrders.length} orders</span>
-                                                                    </div>
-                                                                    <div className="divide-y divide-stone-50">
-                                                                        {customerOrders.map((o: Order) => {
-                                                                            const paid = (o.advancePaid || 0) + (o.payments || []).reduce((s: number, p: any) => s + p.amount, 0);
-                                                                            const due = o.amount - paid;
+                                                                        {pendingEntries.map((entry) => {
+                                                                            const remaining = entry.totalAmount - entry.advancePaid;
                                                                             return (
-                                                                                <div key={o.id} className="px-4 py-3 flex items-center justify-between hover:bg-stone-50/50 transition-colors gap-4">
-                                                                                    <div className="min-w-0 flex-1">
-                                                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                                                            <span className="text-[10px] font-black text-gray-900 uppercase">{o.clothType}</span>
-                                                                                            {o.isUrgent && <span className="text-[8px] font-black text-red-500 bg-red-50 px-1.5 py-0.5 rounded uppercase">Urgent</span>}
-                                                                                        </div>
-                                                                                        <div className="flex items-center gap-3 mt-0.5">
-                                                                                            <span className="text-[9px] text-gray-400">{o.orderDate || '—'}</span>
-                                                                                            <span className="text-[9px] text-gray-400">→ {o.deliveryDate}</span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    <div className="text-right shrink-0 space-y-0.5">
-                                                                                        <div className="text-xs font-black text-gray-900">₹{o.amount.toLocaleString()}</div>
-                                                                                        {due > 0 ? (
-                                                                                            <div className="text-[9px] font-bold text-red-500">Due: ₹{due.toLocaleString()}</div>
-                                                                                        ) : (
-                                                                                            <div className="text-[9px] font-bold text-emerald-500">Paid ✓</div>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <span className={`text-[8px] font-black uppercase px-2 py-1 rounded border shrink-0 ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                                                        o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                                                                            'bg-amber-50 text-amber-600 border-amber-100'
-                                                                                        }`}>{o.status}</span>
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Measurements Summary */}
-                                                            {hasMeasurements.length > 0 && (
-                                                                <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-sm">
-                                                                    <div className="px-4 py-3 bg-stone-50 border-b border-stone-100">
-                                                                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Saved Measurements</span>
-                                                                    </div>
-                                                                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                                        {hasMeasurements.map(garment => {
-                                                                            const data = (customer.measurements as any)[garment];
-                                                                            return (
-                                                                                <div key={garment} className="border border-stone-100 rounded-lg p-3">
-                                                                                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2">{garment}</p>
-                                                                                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                                                                                        {Object.entries(data).filter(([k]) => k !== 'lastUpdated').map(([key, val]) => (
-                                                                                            <span key={key} className="text-[10px] text-gray-600">
-                                                                                                <span className="capitalize text-gray-400">{key}: </span>
-                                                                                                <span className="font-black text-gray-800">{val as string}&quot;</span>
-                                                                                            </span>
-                                                                                        ))}
+                                                                                <div key={entry.id} className="grid grid-cols-[110px_minmax(0,1fr)_110px_110px_120px_120px] gap-3 border-b border-stone-100 px-4 py-3 text-sm last:border-b-0">
+                                                                                    <span className="text-stone-600">{entry.date}</span>
+                                                                                    <span className="font-medium text-stone-800">{entry.particular}</span>
+                                                                                    <span className="text-right text-stone-700">Rs. {entry.totalAmount.toLocaleString()}</span>
+                                                                                    <span className="text-right text-stone-700">Rs. {entry.advancePaid.toLocaleString()}</span>
+                                                                                    <span className={`text-right font-black ${remaining > 0 ? 'text-red-600' : 'text-stone-900'}`}>
+                                                                                        Rs. {remaining.toLocaleString()}
+                                                                                    </span>
+                                                                                    <div className="flex justify-end gap-2">
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => handleEditCustomerLedgerEntry(entry)}
+                                                                                            className="border border-stone-300 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-stone-700"
+                                                                                        >
+                                                                                            Edit
+                                                                                        </button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => setCustomerLedgerDeleteTarget({
+                                                                                                customerId: customer.id,
+                                                                                                entryId: entry.id,
+                                                                                                particular: entry.particular
+                                                                                            })}
+                                                                                            className="border border-stone-300 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-red-600"
+                                                                                        >
+                                                                                            Delete
+                                                                                        </button>
                                                                                     </div>
                                                                                 </div>
                                                                             );
                                                                         })}
                                                                     </div>
-                                                                </div>
-                                                            )}
-
+                                                                ) : (
+                                                                    <div className="px-4 py-6 text-sm text-stone-500">
+                                                                        No pending ledger entries for this customer.
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     );
                                                 })()}
@@ -1571,7 +1741,7 @@ export default function Dashboard() {
 
                         {/* Footer */}
                         <div className="text-center pt-8 pb-4">
-                            <p className="text-gray-300 text-xs font-medium">© 2024 Indigo Denim & Copper. Craftsman Dashboard v1.0</p>
+                            <p className="text-gray-300 text-xs font-medium">Ãƒâ€šÃ‚Â© 2024 Indigo Denim & Copper. Craftsman Dashboard v1.0</p>
                         </div>
 
                     </div>
@@ -1672,7 +1842,7 @@ export default function Dashboard() {
                                                 </div>
                                                 <div className="text-left sm:text-right w-full sm:w-auto">
                                                     <span className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] block mb-1">Order Valuation</span>
-                                                    <span className="text-2xl sm:text-3xl font-black text-[#131b2e] tabular-nums">₹{selectedOrderForDetails.amount.toLocaleString()}</span>
+                                                    <span className="text-2xl sm:text-3xl font-black text-[#131b2e] tabular-nums">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{selectedOrderForDetails.amount.toLocaleString()}</span>
                                                 </div>
                                             </div>
 
@@ -1683,7 +1853,7 @@ export default function Dashboard() {
                                                         <Calendar className="w-3 h-3 text-orange-400" />
                                                         Order Date
                                                     </p>
-                                                    <p className="text-xs font-bold text-gray-900">{selectedOrderForDetails.orderDate ? new Date(selectedOrderForDetails.orderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</p>
+                                                    <p className="text-xs font-bold text-gray-900">{selectedOrderForDetails.orderDate ? new Date(selectedOrderForDetails.orderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</p>
                                                 </div>
                                                 <div className="p-4 bg-white/50">
                                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
@@ -1744,11 +1914,7 @@ export default function Dashboard() {
                                                         const isOrdered = garments.includes(type);
                                                         if (!isOrdered && !data) return null;
 
-                                                        const fields = type === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
-                                                            type === 'pant' ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] :
-                                                                type === 'kurta' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] :
-                                                                    type === 'suit' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck'] :
-                                                                        type === 'vest' ? ['length', 'chest', 'waist'] : [];
+                                                        const fields = measurementBaseFields[type];
 
                                                         return (
                                                             <div key={type} className={`relative bg-white border-2 rounded-2xl overflow-hidden shadow-sm transition-all duration-300 ${isOrdered ? 'border-[#131b2e]' : 'border-stone-100 opacity-80'}`}>
@@ -1770,10 +1936,17 @@ export default function Dashboard() {
                                                                 <div className="p-4 bg-white">
                                                                     {data ? (
                                                                         <div className="space-y-1.5 h-auto min-h-[140px]">
-                                                                            {fields.map((field) => (
-                                                                                <div key={field} className="flex justify-between border-b border-stone-100 pb-1.5 last:border-none focus-within:bg-orange-50 transition-colors rounded px-1 -mx-1">
-                                                                                    <span className="text-[10px] font-bold text-slate-500 capitalize">{field}</span>
-                                                                                    <span className="text-xs font-black text-slate-800">{data[field] || '—'}&quot;</span>
+                                                                            {getMeasurementFieldRows(fields, data).map((row) => (
+                                                                                <div
+                                                                                    key={row.join('|')}
+                                                                                    className={`border-b border-stone-100 pb-1.5 last:border-none transition-colors rounded px-1 -mx-1 ${row.length === 3 ? 'grid grid-cols-3 gap-3' : row.length === 2 ? 'grid grid-cols-2 gap-3' : 'flex justify-between focus-within:bg-orange-50'}`}
+                                                                                >
+                                                                                    {row.map((field) => (
+                                                                                        <div key={field} className="flex justify-between gap-2">
+                                                                                            <span className="text-[10px] font-bold text-slate-500">{formatMeasurementLabel(field)}</span>
+                                                                                            <span className="text-xs font-black text-slate-800">{formatMeasurementValue(getMeasurementValue(data, field))}</span>
+                                                                                        </div>
+                                                                                    ))}
                                                                                 </div>
                                                                             ))}
                                                                         </div>
@@ -1822,7 +1995,7 @@ export default function Dashboard() {
                                                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 grid grid-cols-2 gap-4">
                                                         <div>
                                                             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Total Amount</span>
-                                                            <span className="text-lg font-black text-slate-900">₹{selectedOrderForDetails.amount.toLocaleString()}</span>
+                                                            <span className="text-lg font-black text-slate-900">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{selectedOrderForDetails.amount.toLocaleString()}</span>
                                                         </div>
                                                         <div>
                                                             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Remaining Due</span>
@@ -1831,7 +2004,7 @@ export default function Dashboard() {
                                                                 const due = selectedOrderForDetails.amount - totalPaid;
                                                                 return (
                                                                     <span className={`text-lg font-black ${due > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                                                        ₹{Math.max(0, due).toLocaleString()}
+                                                                        ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{Math.max(0, due).toLocaleString()}
                                                                     </span>
                                                                 );
                                                             })()}
@@ -1846,7 +2019,7 @@ export default function Dashboard() {
                                                                     <p className="text-[10px] font-black text-slate-700 uppercase">Advance Payment</p>
                                                                     <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Initial Deposit</p>
                                                                 </div>
-                                                                <span className="text-xs font-black text-slate-600">₹{selectedOrderForDetails.advancePaid?.toLocaleString()}</span>
+                                                                <span className="text-xs font-black text-slate-600">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{selectedOrderForDetails.advancePaid?.toLocaleString()}</span>
                                                             </div>
                                                             {(selectedOrderForDetails.payments || []).map((p, i) => (
                                                                 <div key={i} className="flex justify-between items-center py-2 px-3 bg-white border border-stone-100 rounded-lg">
@@ -1854,7 +2027,7 @@ export default function Dashboard() {
                                                                         <p className="text-[10px] font-black text-slate-700 uppercase">Collection ({p.method})</p>
                                                                         <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{new Date(p.date).toLocaleDateString()}</p>
                                                                     </div>
-                                                                    <span className="text-xs font-black text-slate-600">₹{p.amount.toLocaleString()}</span>
+                                                                    <span className="text-xs font-black text-slate-600">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{p.amount.toLocaleString()}</span>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -1984,9 +2157,85 @@ export default function Dashboard() {
                 </DialogContent>
             </Dialog >
 
+            {/* Measurement View Dialog */}
+            <Dialog open={!!viewingMeasurementGarment} onOpenChange={(open) => { if (!open) setViewingMeasurementGarment(null); }}>
+                <DialogContent className="sm:max-w-md bg-white border border-stone-200 shadow-xl rounded-lg p-0 overflow-hidden">
+                    <DialogHeader className="px-5 py-3 border-b border-stone-100 bg-stone-50/50">
+                        <DialogTitle className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                            {viewingMeasurementGarment?.label} Measurements
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="px-5 py-4 space-y-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
+                        {viewingMeasurementGarment?.data ? (
+                            <div className="space-y-2">
+                                {getMeasurementFieldRows(getVisibleMeasurementFields(viewingMeasurementGarment.fields || [], viewingMeasurementGarment.data, viewingMeasurementGarment.optionalFields || []), viewingMeasurementGarment.data).map((row) => (
+                                    <div
+                                        key={row.join('|')}
+                                        className={`border-b border-stone-100 pb-2 last:border-none ${row.length === 3
+                                            ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                            : row.length === 2
+                                                ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                                : 'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                            }`}
+                                    >
+                                        {row.map((field) => (
+                                            <React.Fragment key={field}>
+                                                <span className="min-w-0 text-[10px] font-bold text-gray-400 uppercase">
+                                                    {formatMeasurementLabel(field)}
+                                                </span>
+                                                <span className="text-right text-sm font-black text-gray-900">
+                                                    {formatMeasurementValue(getMeasurementValue(viewingMeasurementGarment.data, field))}
+                                                </span>
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                ))}
+                                {getMeasurementNotes(viewingMeasurementGarment.data).trim() && (
+                                    <div className="border-t border-stone-100 pt-3">
+                                        <div className="mb-2 text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                                            Notes
+                                        </div>
+                                        <div className="rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-3 text-sm font-medium leading-6 text-gray-700 whitespace-pre-wrap">
+                                            {getMeasurementNotes(viewingMeasurementGarment.data)}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="py-10 text-center text-sm font-bold text-gray-400">
+                                No measurements saved for this garment yet.
+                            </div>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-2 border-t border-stone-100">
+                        <button
+                            type="button"
+                            onClick={() => setViewingMeasurementGarment(null)}
+                            className="py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:bg-stone-50 transition-colors border-r border-stone-100"
+                        >
+                            Close
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setEditingMeasurementGarment(viewingMeasurementGarment.type as any);
+                                setEditingCustomGarmentId(viewingMeasurementGarment.customId || null);
+                                setCustomGarmentName(viewingMeasurementGarment.customId ? viewingMeasurementGarment.label : '');
+                                setCustomCategory(viewingMeasurementGarment.category || 'top');
+                                setMeasurementForm(viewingMeasurementGarment.data || {});
+                                setViewingMeasurementGarment(null);
+                            }}
+                            className="py-3 text-[10px] font-black text-white bg-gray-900 uppercase tracking-widest hover:bg-black transition-colors"
+                        >
+                            Edit
+                        </button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* Measurement Edit Dialog */}
             <Dialog open={!!editingMeasurementGarment} onOpenChange={(open) => { if (!open) { setEditingMeasurementGarment(null); setEditingCustomGarmentId(null); setCustomGarmentName(''); setMeasurementForm({}); } }}>
-                <DialogContent className="sm:max-w-sm bg-white border border-stone-200 shadow-xl rounded-lg p-0 overflow-hidden">
+                <DialogContent className="sm:max-w-md bg-white border border-stone-200 shadow-xl rounded-lg p-0 overflow-hidden">
                     <DialogHeader className="px-5 py-3 border-b border-stone-100 bg-stone-50/50">
                         <DialogTitle className="text-sm font-black text-gray-900 uppercase tracking-wider">
                             {editingMeasurementGarment === 'custom'
@@ -2025,44 +2274,68 @@ export default function Dashboard() {
                         )}
                         <div className="space-y-2">
                             {(() => {
-                                const baseFields = (editingMeasurementGarment === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
-                                    editingMeasurementGarment === 'pant' ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] :
-                                        editingMeasurementGarment === 'kurta' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] :
-                                            editingMeasurementGarment === 'suit' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck'] :
-                                                editingMeasurementGarment === 'vest' ? ['length', 'chest', 'waist'] :
-                                                    editingMeasurementGarment === 'custom' ? (customCategory === 'top' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] : ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom']) : []);
+                                const baseFields: ReadonlyArray<string> = editingMeasurementGarment === 'shirt' ? measurementBaseFields.shirt :
+                                    editingMeasurementGarment === 'pant' ? measurementBaseFields.pant :
+                                        editingMeasurementGarment === 'kurta' ? measurementBaseFields.kurta :
+                                            editingMeasurementGarment === 'suit' ? measurementBaseFields.suit :
+                                                editingMeasurementGarment === 'vest' ? measurementBaseFields.vest :
+                                                    editingMeasurementGarment === 'custom' ? (customCategory === 'top' ? measurementBaseFields.customTop : measurementBaseFields.customBottom) : [];
 
-                                const extraFields = Object.keys(measurementForm).filter(k => k !== 'lastUpdated' && !baseFields.includes(k));
-                                const allFields = [...baseFields, ...extraFields];
-
-                                return allFields.map(field => (
-                                    <div key={field} className="flex items-center justify-between border-b border-stone-100 pb-2 last:border-none">
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase w-32 capitalize">{field}</label>
-                                        <div className="flex items-center gap-2 group">
-                                            <input
-                                                type="number"
-                                                step="0.5"
-                                                value={measurementForm[field] || ''}
-                                                onChange={e => setMeasurementForm((prev: any) => ({ ...prev, [field]: e.target.value }))}
-                                                placeholder="0"
-                                                className="w-16 text-right text-xs font-black text-gray-900 bg-stone-50 border border-stone-200 rounded px-2 py-1 outline-none focus:border-gray-400"
-                                            />
-                                            <span className="text-[10px] font-bold text-gray-400">&quot;</span>
-                                            {extraFields.includes(field) && (
-                                                <button
-                                                    onClick={() => {
-                                                        const newForm = { ...measurementForm };
-                                                        delete newForm[field];
-                                                        setMeasurementForm(newForm);
-                                                    }}
-                                                    className="p-1 text-red-400 hover:text-red-600 transition-colors"
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
-                                            )}
-                                        </div>
+                                const optionalFields: ReadonlyArray<string> = editingMeasurementGarment === 'shirt' ? measurementOptionalFields.shirt :
+                                    editingMeasurementGarment === 'pant' ? measurementOptionalFields.pant :
+                                        editingMeasurementGarment === 'kurta' ? measurementOptionalFields.kurta :
+                                            editingMeasurementGarment === 'suit' ? measurementOptionalFields.suit :
+                                                editingMeasurementGarment === 'vest' ? measurementOptionalFields.vest :
+                                                    editingMeasurementGarment === 'custom' ? (customCategory === 'top' ? measurementOptionalFields.customTop : measurementOptionalFields.customBottom) : [];
+                                const visibleFields = getVisibleMeasurementFields(baseFields, measurementForm, optionalFields);
+                                const extraFields = getExtraMeasurementFields(visibleFields, measurementForm);
+                                const enabledOptionalFields = getEnabledOptionalMeasurementFields(measurementForm);
+                                return (
+                                    <>
+                                        {getMeasurementFieldRows(visibleFields, measurementForm).map((row) => (
+                                    <div
+                                        key={row.join('|')}
+                                        className={`border-b border-stone-100 py-2 last:border-none ${row.length === 3
+                                            ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                            : row.length === 2
+                                                ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                                : 'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                            }`}
+                                    >
+                                        {row.map((field) => (
+                                            <React.Fragment key={field}>
+                                                <label className="min-w-0 text-[10px] font-black text-gray-400 uppercase tracking-wide">
+                                                    {formatMeasurementLabel(field)}
+                                                </label>
+                                                <div className="flex items-center justify-end gap-2 group shrink-0">
+                                                    <input
+                                                        type="number"
+                                                        step="0.5"
+                                                        value={getMeasurementValue(measurementForm, field) || ''}
+                                                        onChange={e => setMeasurementForm((prev: any) => ({ ...prev, [field]: e.target.value }))}
+                                                        placeholder="0"
+                                                        className="h-8 w-[56px] text-right text-xs font-black text-gray-900 bg-white border border-stone-200 rounded-md px-2 py-1 shadow-[0_1px_2px_rgba(15,23,42,0.08)] outline-none focus:border-gray-400"
+                                                    />
+                                                    <span className="text-[10px] font-bold text-gray-400">&quot;</span>
+                                                    {extraFields.includes(field) && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const newForm = { ...measurementForm };
+                                                                delete newForm[field];
+                                                                setMeasurementForm(newForm);
+                                                            }}
+                                                            className="p-1 text-red-400 hover:text-red-600 transition-colors"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </React.Fragment>
+                                        ))}
                                     </div>
-                                ));
+                                ))}
+                                    </>
+                                );
                             })()}
                         </div>
 
@@ -2110,6 +2383,69 @@ export default function Dashboard() {
                                 </button>
                             )}
                         </div>
+                        {(() => {
+                            const optionalFields: ReadonlyArray<string> = editingMeasurementGarment === 'shirt' ? measurementOptionalFields.shirt :
+                                editingMeasurementGarment === 'pant' ? measurementOptionalFields.pant :
+                                    editingMeasurementGarment === 'kurta' ? measurementOptionalFields.kurta :
+                                        editingMeasurementGarment === 'suit' ? measurementOptionalFields.suit :
+                                            editingMeasurementGarment === 'vest' ? measurementOptionalFields.vest :
+                                                editingMeasurementGarment === 'custom' ? (customCategory === 'top' ? measurementOptionalFields.customTop : measurementOptionalFields.customBottom) : [];
+                            const enabledOptionalFields = getEnabledOptionalMeasurementFields(measurementForm);
+
+                            if (optionalFields.length === 0) return null;
+
+                            return (
+                                <div className="pt-1">
+                                    <div className="border border-dashed border-stone-200 rounded p-3">
+                                        <label className="mb-2 block text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                                            Optional Measurements
+                                        </label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {optionalFields.map((field) => {
+                                                const enabled = enabledOptionalFields.includes(field);
+                                                return (
+                                                    <button
+                                                        key={field}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setMeasurementForm((prev: any) => {
+                                                                const currentEnabled = getEnabledOptionalMeasurementFields(prev);
+                                                                const nextEnabled = currentEnabled.includes(field)
+                                                                    ? currentEnabled.filter((item) => item !== field)
+                                                                    : [...currentEnabled, field];
+
+                                                                const nextForm = { ...prev, enabledOptionalFields: nextEnabled };
+                                                                if (currentEnabled.includes(field) && String(getMeasurementValue(prev, field) || '').trim() === '') {
+                                                                    delete nextForm[field];
+                                                                }
+                                                                return nextForm;
+                                                            });
+                                                        }}
+                                                        className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${enabled ? 'border-gray-900 bg-gray-900 text-white' : 'border-stone-200 bg-white text-gray-500 hover:border-gray-400'}`}
+                                                    >
+                                                        <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border text-[9px] ${enabled ? 'border-white/60 bg-white/15 text-white' : 'border-stone-300 text-transparent'}`}>ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“</span>
+                                                        {formatMeasurementLabel(field)}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                        <div className="pt-1">
+                            <div className="border border-dashed border-stone-200 rounded p-3">
+                                <label className="mb-2 block text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                                    Add Notes
+                                </label>
+                                <textarea
+                                    value={getMeasurementNotes(measurementForm)}
+                                    onChange={e => setMeasurementForm((prev: any) => ({ ...prev, notes: e.target.value }))}
+                                    placeholder="Add notes"
+                                    className="min-h-[88px] w-full resize-none rounded border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 outline-none transition-colors focus:border-orange-400"
+                                />
+                            </div>
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 border-t border-stone-100">
                         <button type="button"
@@ -2120,6 +2456,44 @@ export default function Dashboard() {
                             onClick={handleSaveMeasurements}
                             className="py-3 text-[10px] font-black text-white bg-gray-900 uppercase tracking-widest hover:bg-black transition-colors"
                         >Save</button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!customerLedgerDeleteTarget} onOpenChange={(open) => { if (!open) setCustomerLedgerDeleteTarget(null); }}>
+                <DialogContent className="sm:max-w-md bg-white border border-stone-200 shadow-xl rounded-lg p-0 overflow-hidden">
+                    <DialogHeader className="px-5 py-4 border-b border-stone-100 bg-stone-50/50">
+                        <DialogTitle className="text-sm font-black text-gray-900 uppercase tracking-wider">
+                            Delete Ledger Entry
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="px-5 py-4 space-y-3">
+                        <p className="text-sm font-medium text-gray-700">
+                            Delete this ledger entry{customerLedgerDeleteTarget?.particular ? ` for ${customerLedgerDeleteTarget.particular}` : ''}?
+                        </p>
+                        <p className="text-xs text-gray-400">
+                            This action cannot be undone.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 border-t border-stone-100">
+                        <button
+                            type="button"
+                            onClick={() => setCustomerLedgerDeleteTarget(null)}
+                            className="py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:bg-stone-50 transition-colors border-r border-stone-100"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const customer = customers.find((entry) => entry.id === customerLedgerDeleteTarget?.customerId);
+                                if (!customer || !customerLedgerDeleteTarget) return;
+                                handleDeleteCustomerLedgerEntry(customer, customerLedgerDeleteTarget.entryId);
+                            }}
+                            className="py-3 text-[10px] font-black text-white bg-red-600 uppercase tracking-widest hover:bg-red-700 transition-colors"
+                        >
+                            Delete
+                        </button>
                     </div>
                 </DialogContent>
             </Dialog>

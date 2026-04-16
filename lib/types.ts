@@ -29,12 +29,19 @@ export interface Customer {
     lastOrderDate: string;
     address?: string;
     notes?: string;
+    ledgerEntries?: Array<{
+        id: string;
+        date: string;
+        particular: string;
+        totalAmount: number;
+        advancePaid: number;
+    }>;
     measurements?: {
-        shirt?: { length: string; chest: string; waist: string; shoulder: string; sleeve: string; neck: string; cuff: string; lastUpdated?: string };
-        pant?: { length: string; waist: string; hip: string; thigh: string; knee: string; bottom: string; lastUpdated?: string };
-        kurta?: { length: string; chest: string; waist: string; hip: string; shoulder: string; sleeve: string; neck: string; lastUpdated?: string };
-        suit?: { length: string; chest: string; waist: string; shoulder: string; sleeve: string; neck: string; lastUpdated?: string };
-        vest?: { length: string; chest: string; waist: string; lastUpdated?: string };
+        shirt?: { [key: string]: string | undefined; lastUpdated?: string };
+        pant?: { [key: string]: string | undefined; lastUpdated?: string };
+        kurta?: { [key: string]: string | undefined; lastUpdated?: string };
+        suit?: { [key: string]: string | undefined; lastUpdated?: string };
+        vest?: { [key: string]: string | undefined; lastUpdated?: string };
         customItems?: Array<{
             id: string;
             name: string;

@@ -10,6 +10,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Customer, Order, OrderStatus } from '@/lib/types';
 import {
+    formatMeasurementLabel,
+    getEnabledOptionalMeasurementFields,
+    getExtraMeasurementFields,
+    getMeasurementNotes,
+    getMeasurementFieldRows,
+    getMeasurementValue,
+    isMeasurementComplete,
+    measurementBaseFields,
+    measurementOptionalFields,
+    getVisibleMeasurementFields,
+} from '@/lib/measurement-layout';
+import {
     Search,
     User,
     ChevronRight,
@@ -162,6 +174,22 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
         setShowCustomerSuggestions(false);
     };
 
+    const hasRequiredMeasurements = (type: string, data?: Record<string, any>) => {
+        const normalizedType = type.toLowerCase();
+
+        if (normalizedType === 'custom') {
+            return !!data && Object.keys(data).filter(key => key !== 'lastUpdated' && key !== 'notes').some(key => {
+                const value = data[key];
+                return value !== undefined && value !== null && String(value).trim() !== '';
+            });
+        }
+
+        const baseFields = measurementBaseFields[normalizedType as keyof typeof measurementBaseFields];
+        if (!baseFields) return false;
+
+        return isMeasurementComplete(baseFields, data);
+    };
+
     const handleProceed = () => {
         if (currentStep === 1 && !canProceedStep1) return;
         if (currentStep === 2 && newOrderForm.items.length === 0) return;
@@ -171,8 +199,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
             const missing = newOrderForm.items.some(item => {
                 const type = item.garment_type.toLowerCase();
                 const m = (newOrderForm.measurements as any)?.[type];
-                const hasData = m && Object.keys(m).filter(k => k !== 'lastUpdated').some(k => m[k] && m[k].toString().trim() !== '');
-                return !hasData;
+                return !hasRequiredMeasurements(type, m);
             });
             if (missing) setCurrentStep(3);
             else setCurrentStep(4);
@@ -593,7 +620,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                         </div>
                                         {(() => {
                                             const m = (newOrderForm.measurements as any)?.[type.toLowerCase()];
-                                            const hasData = m && Object.keys(m).filter(k => k !== 'lastUpdated').some(k => m[k] && m[k].toString().trim() !== '');
+                                            const hasData = hasRequiredMeasurements(type, m);
 
                                             return hasData ? (
                                                 <div className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded flex items-center gap-1">
@@ -601,7 +628,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                 </div>
                                             ) : (
                                                 <div className="text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded flex items-center gap-1">
-                                                    <AlertCircle className="w-2.5 h-2.5" /> No Measurements Set
+                                                    <AlertCircle className="w-2.5 h-2.5" /> Measurements Incomplete
                                                 </div>
                                             );
                                         })()}
@@ -669,7 +696,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                     const type = item.garment_type;
                     const displayName = type === 'Custom' ? (item.custom_name || 'Custom Item') : type;
                     const m = (newOrderForm.measurements as any)?.[type.toLowerCase()];
-                    const hasData = m && Object.keys(m).filter(k => k !== 'lastUpdated').some(k => m[k] && m[k].toString().trim() !== '');
+                    const hasData = hasRequiredMeasurements(type, m);
 
                     return (
                         <div key={idx} className={`p-4 rounded-2xl border-2 transition-all ${hasData ? 'bg-emerald-50/30 border-emerald-100' : 'bg-white border-stone-100 shadow-sm'}`}>
@@ -769,8 +796,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                     {newOrderForm.items.some(item => {
                         const type = item.garment_type.toLowerCase();
                         const m = (newOrderForm.measurements as any)?.[type];
-                        const hasData = m && Object.keys(m).filter(k => k !== 'lastUpdated').some(k => m[k] && m[k].toString().trim() !== '');
-                        return !hasData;
+                        return !hasRequiredMeasurements(type, m);
                     }) && (
                             <div className="bg-red-50 border border-red-100 p-4 rounded-2xl flex items-center gap-3 animate-pulse mb-4">
                                 <AlertCircle className="w-5 h-5 text-red-500" />
@@ -901,16 +927,23 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                 const type = editingMeasurementsType?.toLowerCase();
                                 const isCustom = type === 'custom';
 
-                                const baseFields = type === 'shirt' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck', 'cuff'] :
-                                    type === 'pant' ? ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom'] :
-                                        type === 'kurta' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] :
-                                            type === 'suit' ? ['length', 'chest', 'waist', 'shoulder', 'sleeve', 'neck'] :
-                                                type === 'vest' ? ['length', 'chest', 'waist'] :
-                                                    isCustom ? (customCategory === 'top' ? ['length', 'chest', 'waist', 'hip', 'shoulder', 'sleeve', 'neck'] : ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom']) : [];
+                                const baseFields: ReadonlyArray<string> = type === 'shirt' ? measurementBaseFields.shirt :
+                                    type === 'pant' ? measurementBaseFields.pant :
+                                        type === 'kurta' ? measurementBaseFields.kurta :
+                                            type === 'suit' ? measurementBaseFields.suit :
+                                                type === 'vest' ? measurementBaseFields.vest :
+                                                    isCustom ? (customCategory === 'top' ? measurementBaseFields.customTop : measurementBaseFields.customBottom) : [];
+                                const optionalFields: ReadonlyArray<string> = type === 'shirt' ? measurementOptionalFields.shirt :
+                                    type === 'pant' ? measurementOptionalFields.pant :
+                                        type === 'kurta' ? measurementOptionalFields.kurta :
+                                            type === 'suit' ? measurementOptionalFields.suit :
+                                                type === 'vest' ? measurementOptionalFields.vest :
+                                                    isCustom ? (customCategory === 'top' ? measurementOptionalFields.customTop : measurementOptionalFields.customBottom) : [];
 
                                 const currentMeasures = (newOrderForm.measurements as any)?.[type as any] || {};
-                                const extraFields = Object.keys(currentMeasures).filter(k => k !== 'lastUpdated' && !baseFields.includes(k));
-                                const allFields = [...baseFields, ...extraFields];
+                                const visibleFields = getVisibleMeasurementFields(baseFields, currentMeasures, optionalFields);
+                                const extraFields = getExtraMeasurementFields(visibleFields, currentMeasures);
+                                const enabledOptionalFields = getEnabledOptionalMeasurementFields(currentMeasures);
 
                                 return (
                                     <div className="space-y-6 w-full">
@@ -930,50 +963,62 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                 </button>
                                             </div>
                                         )}
-                                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                                            {allFields.map(field => (
-                                                <div key={field} className="flex items-center justify-between border-b border-stone-50 pb-2">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest capitalize">{field}</label>
-                                                    <div className="flex items-center gap-1 group">
-                                                        <input
-                                                            type="number"
-                                                            step="0.125"
-                                                            value={currentMeasures[field] || ''}
-                                                            onChange={e => {
-                                                                const val = e.target.value;
-                                                                setNewOrderForm(prev => ({
-                                                                    ...prev,
-                                                                    measurements: {
-                                                                        ...prev.measurements,
-                                                                        [type!]: {
-                                                                            ...((prev.measurements?.[type as keyof Customer['measurements']] as any) || {}),
-                                                                            [field]: val
-                                                                        }
-                                                                    }
-                                                                }));
-                                                            }}
-                                                            className="w-14 h-8 text-right text-xs font-black text-[#131b2e] bg-slate-50 border border-stone-200 rounded px-2 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all"
-                                                        />
-                                                        <span className="text-[10px] font-bold text-slate-400">&quot;</span>
-                                                        {extraFields.includes(field) && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    const newMeasures = { ...currentMeasures };
-                                                                    delete newMeasures[field];
-                                                                    setNewOrderForm(prev => ({
-                                                                        ...prev,
-                                                                        measurements: {
-                                                                            ...prev.measurements,
-                                                                            [type!]: newMeasures
-                                                                        }
-                                                                    }));
-                                                                }}
-                                                                className="p-1 text-gray-300 hover:text-red-500"
-                                                            >
-                                                                <Trash2 className="w-3 h-3" />
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                        <div className="space-y-2">
+                                            {getMeasurementFieldRows(visibleFields, currentMeasures).map(row => (
+                                                <div
+                                                    key={row.join('|')}
+                                                    className={`${row.length === 3
+                                                        ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-4 gap-y-2'
+                                                        : row.length === 2
+                                                            ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-5 gap-y-2'
+                                                            : 'grid grid-cols-[minmax(0,1fr)_auto] gap-y-2'
+                                                        } border-b border-stone-100 py-2`}
+                                                >
+                                                    {row.map(field => (
+                                                        <React.Fragment key={field}>
+                                                            <label className="min-w-0 text-[10px] font-black text-slate-400 uppercase tracking-wide">{formatMeasurementLabel(field)}</label>
+                                                            <div className="flex items-center justify-end gap-1 group shrink-0">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.125"
+                                                                    value={getMeasurementValue(currentMeasures, field) || ''}
+                                                                    onChange={e => {
+                                                                        const val = e.target.value;
+                                                                        setNewOrderForm(prev => ({
+                                                                            ...prev,
+                                                                            measurements: {
+                                                                                ...prev.measurements,
+                                                                                [type!]: {
+                                                                                    ...((prev.measurements?.[type as keyof Customer['measurements']] as any) || {}),
+                                                                                    [field]: val
+                                                                                }
+                                                                            }
+                                                                        }));
+                                                                    }}
+                                                                    className="h-8 w-[56px] rounded-md border border-stone-200 bg-white px-2 text-right text-xs font-black text-[#131b2e] shadow-[0_1px_2px_rgba(15,23,42,0.08)] outline-none transition-all focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                                                                />
+                                                                <span className="text-[10px] font-bold text-slate-400">&quot;</span>
+                                                                {extraFields.includes(field) && (
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            const newMeasures = { ...currentMeasures };
+                                                                            delete newMeasures[field];
+                                                                            setNewOrderForm(prev => ({
+                                                                                ...prev,
+                                                                                measurements: {
+                                                                                    ...prev.measurements,
+                                                                                    [type!]: newMeasures
+                                                                                }
+                                                                            }));
+                                                                        }}
+                                                                        className="p-1 text-gray-300 hover:text-red-500"
+                                                                    >
+                                                                        <Trash2 className="w-3 h-3" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </React.Fragment>
+                                                    ))}
                                                 </div>
                                             ))}
                                         </div>
@@ -1031,6 +1076,78 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                     <Plus className="w-3 h-3" /> Add Extra Point
                                                 </button>
                                             )}
+                                        </div>
+                                        {optionalFields.length > 0 && (
+                                            <div className="pt-1">
+                                                <div className="border border-dashed border-stone-200 rounded p-3">
+                                                    <label className="mb-2 block text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                        Optional Measurements
+                                                    </label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {optionalFields.map(field => {
+                                                            const enabled = enabledOptionalFields.includes(field);
+                                                            return (
+                                                                <button
+                                                                    key={field}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const currentEnabled = getEnabledOptionalMeasurementFields(currentMeasures);
+                                                                        const nextEnabled = currentEnabled.includes(field)
+                                                                            ? currentEnabled.filter(item => item !== field)
+                                                                            : [...currentEnabled, field];
+
+                                                                        const nextMeasures: Record<string, any> = {
+                                                                            ...currentMeasures,
+                                                                            enabledOptionalFields: nextEnabled
+                                                                        };
+
+                                                                        if (currentEnabled.includes(field) && String(getMeasurementValue(currentMeasures, field) || '').trim() === '') {
+                                                                            delete nextMeasures[field];
+                                                                        }
+
+                                                                        setNewOrderForm(prev => ({
+                                                                            ...prev,
+                                                                            measurements: {
+                                                                                ...prev.measurements,
+                                                                                [type!]: nextMeasures
+                                                                            }
+                                                                        }));
+                                                                    }}
+                                                                    className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${enabled ? 'border-[#131b2e] bg-[#131b2e] text-white' : 'border-stone-200 bg-white text-slate-500 hover:border-[#131b2e] hover:text-[#131b2e]'}`}
+                                                                >
+                                                                    <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border text-[9px] ${enabled ? 'border-white/60 bg-white/10 text-white' : 'border-stone-300 text-transparent'}`}>✓</span>
+                                                                    {formatMeasurementLabel(field)}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="pt-1">
+                                            <div className="border border-dashed border-stone-200 rounded p-3">
+                                                <label className="mb-2 block text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                    Add Notes
+                                                </label>
+                                                <textarea
+                                                    value={getMeasurementNotes(currentMeasures)}
+                                                    onChange={e => {
+                                                        const val = e.target.value;
+                                                        setNewOrderForm(prev => ({
+                                                            ...prev,
+                                                            measurements: {
+                                                                ...prev.measurements,
+                                                                [type!]: {
+                                                                    ...((prev.measurements?.[type as keyof Customer['measurements']] as any) || {}),
+                                                                    notes: val
+                                                                }
+                                                            }
+                                                        }));
+                                                    }}
+                                                    placeholder="Add notes"
+                                                    className="min-h-[88px] w-full resize-none rounded border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-[#131b2e] outline-none transition-all focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 );

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/request'
+import type { NextRequest } from 'next/server'
 
 // Simple in-memory storage for rate limiting (per instance)
 // In a serverless environment, this resets often but remains useful
