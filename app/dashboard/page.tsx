@@ -990,7 +990,7 @@ export default function Dashboard() {
                                         { label: 'Total Orders', val: orders.length.toString(), sub: `+${orders.filter(o => o.orderDate?.split('T')[0] === new Date().toISOString().split('T')[0]).length}`, subText: 'new today', subColor: 'text-emerald-500 font-bold', iconType: 'orders', action: () => { setStatusFilter('All'); setDeliveryFilter('All'); setActiveTab('orders'); } },
                                         { label: 'Active Orders', val: activeOrdersCount.toString(), sub: `! ${urgentOrdersCount} Urgent`, subText: 'pending', subColor: 'text-orange-500 font-bold', iconType: 'orders', action: () => { setStatusFilter('Active'); setDeliveryFilter('All'); setActiveTab('orders'); } },
                                         {
-                                            label: "Today's Deliveries", val: completedToday.toString(), sub: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Â¢Ã¢â‚¬â„¢ Pending', subText: orders.filter(o => {
+                                            label: "Today's Deliveries", val: completedToday.toString(), sub: 'Pending', subText: orders.filter(o => {
                                                 const today = new Date().toISOString().split('T')[0];
                                                 return o.deliveryDate === today && o.status !== 'Completed';
                                             }).length.toString(), subColor: 'text-slate-500', iconType: 'delivery', action: () => { setStatusFilter('All'); setDeliveryFilter('Today'); setActiveTab('orders'); }
@@ -1771,7 +1771,7 @@ export default function Dashboard() {
 
                         {/* Footer */}
                         <div className="text-center pt-8 pb-4">
-                            <p className="text-gray-300 text-xs font-medium">Ãƒâ€šÃ‚Â© 2024 Indigo Denim & Copper. Craftsman Dashboard v1.0</p>
+                            <p className="text-gray-300 text-xs font-medium">&copy; 2024 Indigo Denim & Copper. Dadashri&apos;s Dashboard v1.0</p>
                         </div>
 
                     </div>
