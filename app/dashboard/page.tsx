@@ -254,7 +254,7 @@ export default function Dashboard() {
                 activeTabRef.current = e.state.tab;
                 isPopstateRef.current = false;
             } else {
-                // We'd leave the dashboard ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â push forward to stay
+                // We'd leave the dashboard - push forward to stay
                 window.history.pushState({ tab: activeTabRef.current }, '', '/dashboard');
             }
         };
@@ -822,7 +822,7 @@ export default function Dashboard() {
                                                 const totalPaid = (order.advancePaid || 0) + (order.payments || []).reduce((sum, p) => sum + p.amount, 0);
                                                 const due = order.amount - totalPaid;
                                                 if (due <= 0) return <span className="text-[8px] font-bold text-emerald-500 uppercase tracking-tighter">Fully Paid</span>;
-                                                if (totalPaid > 0) return <span className="text-[8px] font-bold text-blue-500 uppercase tracking-tighter">Partial (Due: ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{due.toLocaleString()})</span>;
+                                                if (totalPaid > 0) return <span className="text-[8px] font-bold text-blue-500 uppercase tracking-tighter">Partial (Due: Rs. {due.toLocaleString()})</span>;
                                                 return <span className="text-[8px] font-bold text-red-400 uppercase tracking-tighter">Unpaid</span>;
                                             })()}
                                         </div>
@@ -1452,10 +1452,10 @@ export default function Dashboard() {
                                                                         <div key={o.id} className="px-4 py-3 border-b border-stone-50 last:border-none hover:bg-stone-50/50 transition-colors">
                                                                             {/* Desktop: grid row */}
                                                                             <div className="hidden sm:grid grid-cols-12 gap-2">
-                                                                                <div className="col-span-3 text-[10px] font-bold text-gray-400">{o.orderDate || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</div>
-                                                                                <div className="col-span-3 text-[10px] font-black text-gray-700 uppercase">{o.clothType || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</div>
+                                                                                <div className="col-span-3 text-[10px] font-bold text-gray-400">{o.orderDate || '--'}</div>
+                                                                                <div className="col-span-3 text-[10px] font-black text-gray-700 uppercase">{o.clothType || '--'}</div>
                                                                                 <div className="col-span-2 text-[10px] font-bold text-gray-500">{o.deliveryDate}</div>
-                                                                                <div className="col-span-2 text-xs font-black text-gray-900 text-right">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{o.amount.toLocaleString()}</div>
+                                                                                <div className="col-span-2 text-xs font-black text-gray-900 text-right">Rs. {o.amount.toLocaleString()}</div>
                                                                                 <div className="col-span-2 text-right">
                                                                                     <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                                                                         o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
@@ -1466,11 +1466,11 @@ export default function Dashboard() {
                                                                             {/* Mobile: stacked card */}
                                                                             <div className="sm:hidden flex justify-between items-start gap-2">
                                                                                 <div className="flex-1 min-w-0">
-                                                                                    <p className="text-[11px] font-black text-gray-700 uppercase truncate">{o.clothType || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</p>
-                                                                                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">{o.orderDate || 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ {o.deliveryDate}</p>
+                                                                                    <p className="text-[11px] font-black text-gray-700 uppercase truncate">{o.clothType || '--'}</p>
+                                                                                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">{o.orderDate || '--'}{' -> '}{o.deliveryDate}</p>
                                                                                 </div>
                                                                                 <div className="text-right shrink-0">
-                                                                                    <p className="text-xs font-black text-gray-900">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{o.amount.toLocaleString()}</p>
+                                                                                    <p className="text-xs font-black text-gray-900">Rs. {o.amount.toLocaleString()}</p>
                                                                                     <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded inline-block mt-0.5 ${o.status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                                                                         o.status === 'Ready' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
                                                                                             'bg-amber-50 text-amber-600 border border-amber-100'
@@ -1872,7 +1872,7 @@ export default function Dashboard() {
                                                 </div>
                                                 <div className="text-left sm:text-right w-full sm:w-auto">
                                                     <span className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em] block mb-1">Order Valuation</span>
-                                                    <span className="text-2xl sm:text-3xl font-black text-[#131b2e] tabular-nums">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{selectedOrderForDetails.amount.toLocaleString()}</span>
+                                                    <span className="text-2xl sm:text-3xl font-black text-[#131b2e] tabular-nums">Rs. {selectedOrderForDetails.amount.toLocaleString()}</span>
                                                 </div>
                                             </div>
 
@@ -1883,7 +1883,7 @@ export default function Dashboard() {
                                                         <Calendar className="w-3 h-3 text-orange-400" />
                                                         Order Date
                                                     </p>
-                                                    <p className="text-xs font-bold text-gray-900">{selectedOrderForDetails.orderDate ? new Date(selectedOrderForDetails.orderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â'}</p>
+                                                    <p className="text-xs font-bold text-gray-900">{selectedOrderForDetails.orderDate ? new Date(selectedOrderForDetails.orderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '--'}</p>
                                                 </div>
                                                 <div className="p-4 bg-white/50">
                                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
@@ -2041,7 +2041,7 @@ export default function Dashboard() {
                                                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 grid grid-cols-2 gap-4">
                                                         <div>
                                                             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Total Amount</span>
-                                                            <span className="text-lg font-black text-slate-900">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{selectedOrderForDetails.amount.toLocaleString()}</span>
+                                                            <span className="text-lg font-black text-slate-900">Rs. {selectedOrderForDetails.amount.toLocaleString()}</span>
                                                         </div>
                                                         <div>
                                                             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest block">Remaining Due</span>
@@ -2050,7 +2050,7 @@ export default function Dashboard() {
                                                                 const due = selectedOrderForDetails.amount - totalPaid;
                                                                 return (
                                                                     <span className={`text-lg font-black ${due > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                                                        ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{Math.max(0, due).toLocaleString()}
+                                                                        Rs. {Math.max(0, due).toLocaleString()}
                                                                     </span>
                                                                 );
                                                             })()}
@@ -2065,7 +2065,7 @@ export default function Dashboard() {
                                                                     <p className="text-[10px] font-black text-slate-700 uppercase">Advance Payment</p>
                                                                     <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Initial Deposit</p>
                                                                 </div>
-                                                                <span className="text-xs font-black text-slate-600">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{selectedOrderForDetails.advancePaid?.toLocaleString()}</span>
+                                                                <span className="text-xs font-black text-slate-600">Rs. {selectedOrderForDetails.advancePaid?.toLocaleString()}</span>
                                                             </div>
                                                             {(selectedOrderForDetails.payments || []).map((p, i) => (
                                                                 <div key={i} className="flex justify-between items-center py-2 px-3 bg-white border border-stone-100 rounded-lg">
@@ -2073,7 +2073,7 @@ export default function Dashboard() {
                                                                         <p className="text-[10px] font-black text-slate-700 uppercase">Collection ({p.method})</p>
                                                                         <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{new Date(p.date).toLocaleDateString()}</p>
                                                                     </div>
-                                                                    <span className="text-xs font-black text-slate-600">ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹{p.amount.toLocaleString()}</span>
+                                                                    <span className="text-xs font-black text-slate-600">Rs. {p.amount.toLocaleString()}</span>
                                                                 </div>
                                                             ))}
                                                         </div>
