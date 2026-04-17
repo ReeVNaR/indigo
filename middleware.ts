@@ -21,9 +21,10 @@ async function isValidSessionToken(token?: string): Promise<boolean> {
   try {
     const decoded = atob(token)
     const parts = decoded.split('|')
-    if (parts.length !== 3) return false
+    if (parts.length !== 4) return false
 
-    const [email, expiresAtStr, signature] = parts
+    const [email, expiresAtStr, tokenVersion, signature] = parts
+    if (tokenVersion !== 'v2') return false
     const expiresAt = Number.parseInt(expiresAtStr, 10)
     if (!email || Number.isNaN(expiresAt)) return false
     if (Date.now() / 1000 > expiresAt) return false
@@ -38,7 +39,7 @@ async function isValidSessionToken(token?: string): Promise<boolean> {
     const expectedSigBuffer = await crypto.subtle.sign(
       'HMAC',
       key,
-      new TextEncoder().encode(`${email}|${expiresAtStr}`)
+      new TextEncoder().encode(`${email}|${expiresAtStr}|${tokenVersion}`)
     )
     const expectedSignature = toHex(expectedSigBuffer)
     return signature === expectedSignature

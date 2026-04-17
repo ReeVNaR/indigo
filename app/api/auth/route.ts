@@ -6,11 +6,11 @@ import { getAdminUser, verifyPassword } from '@/lib/users';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@dadashri.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Dadashri@123';
 const SECRET = process.env.AUTH_SECRET || 'dadashri-designers-secret-key-2024';
-const SESSION_DURATION = 24 * 60 * 60; // 1 day
+const SESSION_DURATION = 12 * 60 * 60; // 12 hours
 
 function createToken(email: string): string {
     const expiresAt = Math.floor(Date.now() / 1000) + SESSION_DURATION;
-    const payload = `${email}|${expiresAt}`;
+    const payload = `${email}|${expiresAt}|v2`;
     const signature = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
     return Buffer.from(`${payload}|${signature}`).toString('base64');
 }
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
             path: '/',
-            maxAge: SESSION_DURATION,
+            // Session cookie: removed when browser session ends.
         });
 
         return response;

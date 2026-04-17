@@ -13,16 +13,17 @@ export function verifyToken(token: string): string | null {
     try {
         const decoded = Buffer.from(token, 'base64').toString('utf-8');
         const parts = decoded.split('|');
-        if (parts.length !== 3) return null;
+        if (parts.length !== 4) return null;
 
-        const [email, expiresAtStr, signature] = parts;
+        const [email, expiresAtStr, tokenVersion, signature] = parts;
+        if (tokenVersion !== 'v2') return null;
         const expiresAt = parseInt(expiresAtStr, 10);
 
         // Check expiry
         if (Date.now() / 1000 > expiresAt) return null;
 
         // Verify signature
-        const expectedPayload = `${email}|${expiresAtStr}`;
+        const expectedPayload = `${email}|${expiresAtStr}|${tokenVersion}`;
         const expectedSignature = crypto.createHmac('sha256', SECRET).update(expectedPayload).digest('hex');
 
         if (signature.length !== expectedSignature.length) return null;
