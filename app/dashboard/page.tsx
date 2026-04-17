@@ -21,7 +21,10 @@ import {
     Loader2,
     Search,
     CreditCard,
-    Calendar
+    Calendar,
+    Eye,
+    EyeOff,
+    Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,6 +69,7 @@ import {
     getMeasurementFieldRows,
     getMeasurementNotes,
     getMeasurementValue,
+    isFrontMeasurementRow,
     isMeasurementComplete,
     measurementBaseFields,
     measurementOptionalFields,
@@ -226,6 +230,7 @@ export default function Dashboard() {
     const currencySymbol = 'Rs. ';
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [adminAuthForm, setAdminAuthForm] = useState({ email: '', password: '' });
+    const [showAdminPassword, setShowAdminPassword] = useState(false);
 
     // -- History-aware tab navigation --
     const isPopstateRef = useRef(false);
@@ -1116,7 +1121,7 @@ export default function Dashboard() {
                                                     }}
                                                 >
                                                     <h4 className="font-bold text-gray-900 uppercase text-sm tracking-tight">{c.name}</h4>
-                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{c.phone}</p>
+                                                    <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-0.5">{c.phone}</p>
                                                     {(() => {
                                                         const custOrders = orders.filter(o => o.customerName === c.name);
                                                         const realSpent = custOrders.reduce((s, o) => s + o.amount, 0);
@@ -1175,9 +1180,9 @@ export default function Dashboard() {
                                                         </div>
                                                         <div className="flex flex-col gap-1 mt-1">
                                                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{customer.phone}</p>
+                                                                <p className="text-xs font-bold text-gray-600 uppercase tracking-widest">{customer.phone}</p>
                                                                 <span className="text-[10px] text-gray-300 hidden sm:inline">|</span>
-                                                                <p className="text-[10px] font-bold text-gray-400 break-all">{customer.email}</p>
+                                                                <p className="text-[10px] font-bold text-gray-600 break-all">{customer.email}</p>
                                                             </div>
                                                             {customer.address && (
                                                                 <p className="text-[10px] font-medium text-gray-500 flex items-center gap-1">
@@ -1316,33 +1321,50 @@ export default function Dashboard() {
                                                                         {getMeasurementFieldRows(getVisibleMeasurementFields(garment.fields || [], garment.data, garment.optionalFields || []), garment.data).map((row: string[]) => (
                                                                             (() => {
                                                                                 return (
-                                                                                    <div
-                                                                                        key={row.join('|')}
-                                                                                        className={`border-b border-stone-100/50 pb-1 last:border-none ${
-                                                                                            row.length === 3
-                                                                                                ? 'grid grid-cols-3 gap-2'
-                                                                                                : row.length === 2
-                                                                                                    ? 'grid grid-cols-2 gap-2'
-                                                                                                    : 'grid grid-cols-1'
-                                                                                        }`}
-                                                                                    >
-                                                                                        {row.map((field) => (
-                                                                                            <div key={field} className="flex min-w-0 items-center justify-between gap-2">
-                                                                                                <span className="truncate whitespace-nowrap text-[10px] font-bold text-gray-400">
-                                                                                                    {formatMeasurementLabel(field)}
+                                                                                    isFrontMeasurementRow(row) ? (
+                                                                                        <div key={row.join('|')} className="border-b border-stone-100/50 pb-1 last:border-none">
+                                                                                            <div className="flex min-w-0 items-center justify-between gap-2">
+                                                                                                <span className="truncate whitespace-nowrap text-[10px] font-bold text-gray-600">
+                                                                                                    Front
                                                                                                 </span>
-                                                                                                <span className="shrink-0 whitespace-nowrap text-xs font-black text-gray-700">
-                                                                                                    {formatMeasurementValue(getMeasurementValue(garment.data, field))}
-                                                                                                </span>
+                                                                                                <div className="flex items-center gap-3 shrink-0">
+                                                                                                    {row.map((field) => (
+                                                                                                        <span key={field} className="shrink-0 whitespace-nowrap text-xs font-black text-gray-700">
+                                                                                                            {formatMeasurementValue(getMeasurementValue(garment.data, field))}
+                                                                                                        </span>
+                                                                                                    ))}
+                                                                                                </div>
                                                                                             </div>
-                                                                                        ))}
-                                                                                    </div>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <div
+                                                                                            key={row.join('|')}
+                                                                                            className={`border-b border-stone-100/50 pb-1 last:border-none ${
+                                                                                                row.length === 3
+                                                                                                    ? 'grid grid-cols-3 gap-2'
+                                                                                                    : row.length === 2
+                                                                                                        ? 'grid grid-cols-2 gap-2'
+                                                                                                        : 'grid grid-cols-1'
+                                                                                            }`}
+                                                                                        >
+                                                                                            {row.map((field) => (
+                                                                                                <div key={field} className="flex min-w-0 items-center justify-between gap-2">
+                                                                                                    <span className="truncate whitespace-nowrap text-[10px] font-bold text-gray-600">
+                                                                                                        {formatMeasurementLabel(field)}
+                                                                                                    </span>
+                                                                                                    <span className="shrink-0 whitespace-nowrap text-xs font-black text-gray-700">
+                                                                                                        {formatMeasurementValue(getMeasurementValue(garment.data, field))}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    )
                                                                                 );
                                                                             })()
                                                                         ))}
                                                                         {getMeasurementNotes(garment.data).trim() && (
                                                                             <div className="border-t border-stone-100/50 pt-2">
-                                                                                <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Notes</div>
+                                                                                <div className="text-[8px] font-black text-gray-600 uppercase tracking-widest">Notes</div>
                                                                                 <div className="mt-1 text-[10px] font-medium leading-4 text-gray-600 whitespace-pre-wrap">
                                                                                     {getMeasurementNotes(garment.data)}
                                                                                 </div>
@@ -1470,11 +1492,11 @@ export default function Dashboard() {
                                                                         <div key={i} className="px-4 py-3 border-b border-stone-50 last:border-none hover:bg-stone-50/50 transition-colors">
                                                                             <div className="flex justify-between items-center mb-1">
                                                                                 <span className="text-[10px] font-black text-gray-700 uppercase tracking-tight">{h.type} Updated</span>
-                                                                                <span className="text-[9px] font-bold text-gray-400 uppercase">{new Date(h.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                                                                <span className="text-[9px] font-bold text-gray-600 uppercase">{new Date(h.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                                                                             </div>
                                                                             <div className="flex flex-wrap gap-x-4 gap-y-1">
                                                                                 {Object.entries(h.measurements).map(([key, val]) => (
-                                                                                    <span key={key} className="text-[9px] font-medium text-gray-500">
+                                                                                    <span key={key} className="text-[9px] font-medium text-gray-700">
                                                                                         <span className="capitalize">{key}:</span> <span className="font-bold text-gray-700 font-sans">{val as string}&quot;</span>
                                                                                     </span>
                                                                                 ))}
@@ -1692,15 +1714,23 @@ export default function Dashboard() {
                                                                 placeholder="admin@example.com"
                                                             />
                                                         </div>
-                                                        <div>
+                                                        <div className="relative">
                                                             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">New Password (Leave blank to keep current)</label>
                                                             <input
-                                                                type="password"
+                                                                type={showAdminPassword ? 'text' : 'password'}
                                                                 value={adminAuthForm.password}
                                                                 onChange={e => setAdminAuthForm({ ...adminAuthForm, password: e.target.value })}
-                                                                className="w-full px-4 py-3 border border-stone-200 text-[13px] rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-gray-900 font-bold transition-all bg-stone-50 focus:bg-white"
+                                                                className="w-full px-4 pr-11 py-3 border border-stone-200 text-[13px] rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-gray-900 font-bold transition-all bg-stone-50 focus:bg-white"
                                                                 placeholder="Enter new password"
                                                             />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowAdminPassword((prev) => !prev)}
+                                                                className="absolute right-3 top-[39px] text-gray-400 hover:text-gray-700 transition-colors"
+                                                                aria-label={showAdminPassword ? 'Hide password' : 'Show password'}
+                                                            >
+                                                                {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1937,17 +1967,33 @@ export default function Dashboard() {
                                                                     {data ? (
                                                                         <div className="space-y-1.5 h-auto min-h-[140px]">
                                                                             {getMeasurementFieldRows(fields, data).map((row) => (
-                                                                                <div
-                                                                                    key={row.join('|')}
-                                                                                    className={`border-b border-stone-100 pb-1.5 last:border-none transition-colors rounded px-1 -mx-1 ${row.length === 3 ? 'grid grid-cols-3 gap-3' : row.length === 2 ? 'grid grid-cols-2 gap-3' : 'flex justify-between focus-within:bg-orange-50'}`}
-                                                                                >
-                                                                                    {row.map((field) => (
-                                                                                        <div key={field} className="flex justify-between gap-2">
-                                                                                            <span className="text-[10px] font-bold text-slate-500">{formatMeasurementLabel(field)}</span>
-                                                                                            <span className="text-xs font-black text-slate-800">{formatMeasurementValue(getMeasurementValue(data, field))}</span>
+                                                                                isFrontMeasurementRow(row) ? (
+                                                                                    <div
+                                                                                        key={row.join('|')}
+                                                                                        className="border-b border-stone-100 pb-1.5 last:border-none transition-colors rounded px-1 -mx-1 flex items-center justify-between"
+                                                                                    >
+                                                                                        <span className="text-[10px] font-bold text-slate-500">Front</span>
+                                                                                        <div className="flex items-center gap-3">
+                                                                                            {row.map((field) => (
+                                                                                                <span key={field} className="text-xs font-black text-slate-800">
+                                                                                                    {formatMeasurementValue(getMeasurementValue(data, field))}
+                                                                                                </span>
+                                                                                            ))}
                                                                                         </div>
-                                                                                    ))}
-                                                                                </div>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div
+                                                                                        key={row.join('|')}
+                                                                                        className={`border-b border-stone-100 pb-1.5 last:border-none transition-colors rounded px-1 -mx-1 ${row.length === 3 ? 'grid grid-cols-3 gap-3' : row.length === 2 ? 'grid grid-cols-2 gap-3' : 'flex justify-between focus-within:bg-orange-50'}`}
+                                                                                    >
+                                                                                        {row.map((field) => (
+                                                                                            <div key={field} className="flex justify-between gap-2">
+                                                                                                <span className="text-[10px] font-bold text-slate-500">{formatMeasurementLabel(field)}</span>
+                                                                                                <span className="text-xs font-black text-slate-800">{formatMeasurementValue(getMeasurementValue(data, field))}</span>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )
                                                                             ))}
                                                                         </div>
                                                                     ) : (
@@ -2169,30 +2215,46 @@ export default function Dashboard() {
                         {viewingMeasurementGarment?.data ? (
                             <div className="space-y-2">
                                 {getMeasurementFieldRows(getVisibleMeasurementFields(viewingMeasurementGarment.fields || [], viewingMeasurementGarment.data, viewingMeasurementGarment.optionalFields || []), viewingMeasurementGarment.data).map((row) => (
-                                    <div
-                                        key={row.join('|')}
-                                        className={`border-b border-stone-100 pb-2 last:border-none ${row.length === 3
-                                            ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
-                                            : row.length === 2
-                                                ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
-                                                : 'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2'
-                                            }`}
-                                    >
-                                        {row.map((field) => (
-                                            <React.Fragment key={field}>
-                                                <span className="min-w-0 text-[10px] font-bold text-gray-400 uppercase">
-                                                    {formatMeasurementLabel(field)}
-                                                </span>
-                                                <span className="text-right text-sm font-black text-gray-900">
+                                    isFrontMeasurementRow(row) ? (
+                                        <div
+                                            key={row.join('|')}
+                                            className="border-b border-stone-100 pb-2 last:border-none grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-3 gap-y-2"
+                                        >
+                                            <span className="min-w-0 text-[10px] font-bold text-gray-600 uppercase">
+                                                Front
+                                            </span>
+                                            {row.map((field) => (
+                                                <span key={field} className="text-right text-sm font-black text-gray-900">
                                                     {formatMeasurementValue(getMeasurementValue(viewingMeasurementGarment.data, field))}
                                                 </span>
-                                            </React.Fragment>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div
+                                            key={row.join('|')}
+                                            className={`border-b border-stone-100 pb-2 last:border-none ${row.length === 3
+                                                ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                                : row.length === 2
+                                                    ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                                    : 'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                                }`}
+                                        >
+                                            {row.map((field) => (
+                                                <React.Fragment key={field}>
+                                                    <span className="min-w-0 text-[10px] font-bold text-gray-600 uppercase">
+                                                        {formatMeasurementLabel(field)}
+                                                    </span>
+                                                    <span className="text-right text-sm font-black text-gray-900">
+                                                        {formatMeasurementValue(getMeasurementValue(viewingMeasurementGarment.data, field))}
+                                                    </span>
+                                                </React.Fragment>
+                                            ))}
+                                        </div>
+                                    )
                                 ))}
                                 {getMeasurementNotes(viewingMeasurementGarment.data).trim() && (
                                     <div className="border-t border-stone-100 pt-3">
-                                        <div className="mb-2 text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                                        <div className="mb-2 text-[10px] font-black text-gray-700 uppercase tracking-widest">
                                             Notes
                                         </div>
                                         <div className="rounded-lg bg-amber-50/70 border border-amber-100 px-3 py-3 text-sm font-medium leading-6 text-gray-700 whitespace-pre-wrap">
@@ -2202,7 +2264,7 @@ export default function Dashboard() {
                                 )}
                             </div>
                         ) : (
-                            <div className="py-10 text-center text-sm font-bold text-gray-400">
+                            <div className="py-10 text-center text-sm font-bold text-gray-600">
                                 No measurements saved for this garment yet.
                             </div>
                         )}
@@ -2293,21 +2355,16 @@ export default function Dashboard() {
                                 return (
                                     <>
                                         {getMeasurementFieldRows(visibleFields, measurementForm).map((row) => (
-                                    <div
-                                        key={row.join('|')}
-                                        className={`border-b border-stone-100 py-2 last:border-none ${row.length === 3
-                                            ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
-                                            : row.length === 2
-                                                ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
-                                                : 'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2'
-                                            }`}
-                                    >
-                                        {row.map((field) => (
-                                            <React.Fragment key={field}>
-                                                <label className="min-w-0 text-[10px] font-black text-gray-400 uppercase tracking-wide">
-                                                    {formatMeasurementLabel(field)}
-                                                </label>
-                                                <div className="flex items-center justify-end gap-2 group shrink-0">
+                                    isFrontMeasurementRow(row) ? (
+                                        <div
+                                            key={row.join('|')}
+                                            className="border-b border-stone-100 py-2 last:border-none grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-3 gap-y-2"
+                                        >
+                                            <label className="min-w-0 text-[10px] font-black text-gray-600 uppercase tracking-wide">
+                                                Front
+                                            </label>
+                                            {row.map((field) => (
+                                                <div key={field} className="flex items-center justify-end gap-2 group shrink-0">
                                                     <input
                                                         type="number"
                                                         step="0.5"
@@ -2316,23 +2373,52 @@ export default function Dashboard() {
                                                         placeholder="0"
                                                         className="h-8 w-[56px] text-right text-xs font-black text-gray-900 bg-white border border-stone-200 rounded-md px-2 py-1 shadow-[0_1px_2px_rgba(15,23,42,0.08)] outline-none focus:border-gray-400"
                                                     />
-                                                    <span className="text-[10px] font-bold text-gray-400">&quot;</span>
-                                                    {extraFields.includes(field) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                const newForm = { ...measurementForm };
-                                                                delete newForm[field];
-                                                                setMeasurementForm(newForm);
-                                                            }}
-                                                            className="p-1 text-red-400 hover:text-red-600 transition-colors"
-                                                        >
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </button>
-                                                    )}
+                                                    <span className="text-[10px] font-bold text-gray-600">&quot;</span>
                                                 </div>
-                                            </React.Fragment>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div
+                                            key={row.join('|')}
+                                            className={`border-b border-stone-100 py-2 last:border-none ${row.length === 3
+                                                ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                                : row.length === 2
+                                                    ? 'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                                    : 'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2'
+                                                }`}
+                                        >
+                                            {row.map((field) => (
+                                                <React.Fragment key={field}>
+                                                    <label className="min-w-0 text-[10px] font-black text-gray-600 uppercase tracking-wide">
+                                                        {formatMeasurementLabel(field)}
+                                                    </label>
+                                                    <div className="flex items-center justify-end gap-2 group shrink-0">
+                                                        <input
+                                                            type="number"
+                                                            step="0.5"
+                                                            value={getMeasurementValue(measurementForm, field) || ''}
+                                                            onChange={e => setMeasurementForm((prev: any) => ({ ...prev, [field]: e.target.value }))}
+                                                            placeholder="0"
+                                                            className="h-8 w-[56px] text-right text-xs font-black text-gray-900 bg-white border border-stone-200 rounded-md px-2 py-1 shadow-[0_1px_2px_rgba(15,23,42,0.08)] outline-none focus:border-gray-400"
+                                                        />
+                                                        <span className="text-[10px] font-bold text-gray-600">&quot;</span>
+                                                        {extraFields.includes(field) && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    const newForm = { ...measurementForm };
+                                                                    delete newForm[field];
+                                                                    setMeasurementForm(newForm);
+                                                                }}
+                                                                className="p-1 text-red-400 hover:text-red-600 transition-colors"
+                                                            >
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </React.Fragment>
+                                            ))}
+                                        </div>
+                                    )
                                 ))}
                                     </>
                                 );
@@ -2377,7 +2463,7 @@ export default function Dashboard() {
                             ) : (
                                 <button
                                     onClick={() => setIsAddingExtraField(true)}
-                                    className="w-full py-2 border border-dashed border-stone-200 rounded text-[9px] font-black text-gray-400 uppercase tracking-widest hover:border-gray-400 hover:text-gray-600 transition-all flex items-center justify-center gap-1.5"
+                                    className="w-full py-2 border border-dashed border-stone-200 rounded text-[9px] font-black text-gray-600 uppercase tracking-widest hover:border-gray-400 hover:text-gray-800 transition-all flex items-center justify-center gap-1.5"
                                 >
                                     <Plus className="w-3 h-3" /> Add Extra Point
                                 </button>
@@ -2397,7 +2483,7 @@ export default function Dashboard() {
                             return (
                                 <div className="pt-1">
                                     <div className="border border-dashed border-stone-200 rounded p-3">
-                                        <label className="mb-2 block text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                                        <label className="mb-2 block text-[9px] font-black text-gray-700 uppercase tracking-widest">
                                             Optional Measurements
                                         </label>
                                         <div className="flex flex-wrap gap-2">
@@ -2421,9 +2507,9 @@ export default function Dashboard() {
                                                                 return nextForm;
                                                             });
                                                         }}
-                                                        className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${enabled ? 'border-gray-900 bg-gray-900 text-white' : 'border-stone-200 bg-white text-gray-500 hover:border-gray-400'}`}
+                                                        className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${enabled ? 'border-gray-900 bg-gray-900 text-white' : 'border-stone-200 bg-white text-gray-700 hover:border-gray-400'}`}
                                                     >
-                                                        <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border text-[9px] ${enabled ? 'border-white/60 bg-white/15 text-white' : 'border-stone-300 text-transparent'}`}>ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“</span>
+                                                        <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border text-[9px] ${enabled ? 'border-white/60 bg-white/15 text-white' : 'border-stone-300 text-transparent'}`}><Check className="w-2.5 h-2.5" /></span>
                                                         {formatMeasurementLabel(field)}
                                                     </button>
                                                 );
@@ -2435,7 +2521,7 @@ export default function Dashboard() {
                         })()}
                         <div className="pt-1">
                             <div className="border border-dashed border-stone-200 rounded p-3">
-                                <label className="mb-2 block text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                                <label className="mb-2 block text-[9px] font-black text-gray-700 uppercase tracking-widest">
                                     Add Notes
                                 </label>
                                 <textarea
@@ -2479,7 +2565,7 @@ export default function Dashboard() {
                         <button
                             type="button"
                             onClick={() => setCustomerLedgerDeleteTarget(null)}
-                            className="py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:bg-stone-50 transition-colors border-r border-stone-100"
+                            className="py-3 text-[10px] font-bold text-gray-600 uppercase tracking-widest hover:bg-stone-50 transition-colors border-r border-stone-100"
                         >
                             Cancel
                         </button>

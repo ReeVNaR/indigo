@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Key, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, Key, ShieldCheck } from "lucide-react";
 import { 
   Dialog, 
   DialogContent, 
@@ -49,6 +49,7 @@ const VerifiedIcon = () => (
 export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
@@ -57,6 +58,8 @@ export default function Home() {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [masterKey, setMasterKey] = useState("");
   const [newPassInput, setNewPassInput] = useState("");
+  const [showMasterKey, setShowMasterKey] = useState(false);
+  const [showNewPassInput, setShowNewPassInput] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState("");
   const [resetSuccess, setResetSuccess] = useState(false);
@@ -178,6 +181,14 @@ export default function Home() {
                   placeholder="name@example.com"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-700 transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
@@ -200,10 +211,10 @@ export default function Home() {
                 </div>
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-6 sm:py-3 border-gray-200 rounded-lg text-sm transition-all bg-white shadow-sm focus-visible:ring-amber-500/20 focus-visible:border-amber-500 tracking-widest"
+                  className="block w-full pl-10 pr-11 py-6 sm:py-3 border-gray-200 rounded-lg text-sm transition-all bg-white shadow-sm focus-visible:ring-amber-500/20 focus-visible:border-amber-500 tracking-widest"
                   placeholder="••••••••"
                   required
                 />
@@ -267,34 +278,50 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 relative">
                 <Label htmlFor="masterKey" className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block ml-0.5">
                   Master Security Key
                 </Label>
                 <Input
                   id="masterKey"
-                  type="password"
+                  type={showMasterKey ? "text" : "password"}
                   value={masterKey}
                   onChange={(e) => setMasterKey(e.target.value)}
-                  className="w-full px-4 py-3 border-stone-100 bg-stone-50 rounded-xl text-sm font-bold text-[#131c3f] focus-visible:ring-orange-500/20 focus-visible:border-orange-500 placeholder:text-gray-300"
+                  className="w-full px-4 pr-11 py-3 border-stone-100 bg-stone-50 rounded-xl text-sm font-bold text-[#131c3f] focus-visible:ring-orange-500/20 focus-visible:border-orange-500 placeholder:text-gray-300"
                   placeholder="••••••••••••••••"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowMasterKey((prev) => !prev)}
+                  className="absolute right-3 top-[35px] text-gray-400 hover:text-gray-700 transition-colors"
+                  aria-label={showMasterKey ? "Hide master key" : "Show master key"}
+                >
+                  {showMasterKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
 
-              <div className="space-y-1.5 pt-2 border-t border-stone-50">
+              <div className="space-y-1.5 pt-2 border-t border-stone-50 relative">
                 <Label htmlFor="newPassInput" className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block ml-0.5">
                   New Admin Password
                 </Label>
                 <Input
                   id="newPassInput"
-                  type="password"
+                  type={showNewPassInput ? "text" : "password"}
                   value={newPassInput}
                   onChange={(e) => setNewPassInput(e.target.value)}
-                  className="w-full px-4 py-3 border-stone-100 bg-stone-50 rounded-xl text-sm font-bold text-[#131c3f] focus-visible:ring-orange-500/20 focus-visible:border-orange-500 placeholder:text-gray-300"
+                  className="w-full px-4 pr-11 py-3 border-stone-100 bg-stone-50 rounded-xl text-sm font-bold text-[#131c3f] focus-visible:ring-orange-500/20 focus-visible:border-orange-500 placeholder:text-gray-300"
                   placeholder="Minimum 4 characters"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassInput((prev) => !prev)}
+                  className="absolute right-3 top-[43px] text-gray-400 hover:text-gray-700 transition-colors"
+                  aria-label={showNewPassInput ? "Hide new password" : "Show new password"}
+                >
+                  {showNewPassInput ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 

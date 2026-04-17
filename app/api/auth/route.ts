@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { verifyToken } from '@/lib/auth';
+import { isDevAuthBypassed, verifyToken } from '@/lib/auth';
 import { getAdminUser, verifyPassword } from '@/lib/users';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@dadashri.com';
@@ -63,6 +63,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+    if (isDevAuthBypassed()) {
+        return NextResponse.json({ authenticated: true, email: 'dev@local' });
+    }
+
     const token = req.cookies.get('session_token')?.value;
     if (!token) return NextResponse.json({ authenticated: false }, { status: 401 });
 

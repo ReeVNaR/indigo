@@ -20,7 +20,9 @@ const TOP_MEASUREMENT_FIELDS = [
     'chest',
     'stomach',
     'waist',
-    'front',
+    'front a',
+    'front b',
+    'front c',
     'loosing',
 ] as const;
 
@@ -50,7 +52,9 @@ const FIELD_DEFINITIONS: MeasurementFieldDefinition[] = [
     { key: 'chest', aliases: ['chest'], label: 'Chest' },
     { key: 'stomach', aliases: ['stomach'], label: 'Stomach' },
     { key: 'waist', aliases: ['waist'], label: 'Waist' },
-    { key: 'front', aliases: ['front'], label: 'Front' },
+    { key: 'front a', aliases: ['front a', 'front-a', 'fronta', 'front 1', 'front-1', 'front1', 'front'], label: 'Front' },
+    { key: 'front b', aliases: ['front b', 'front-b', 'frontb', 'front 2', 'front-2', 'front2'], label: 'Front' },
+    { key: 'front c', aliases: ['front c', 'front-c', 'frontc', 'front 3', 'front-3', 'front3'], label: 'Front' },
     { key: 'loosing', aliases: ['loosing'], label: 'Loosing' },
     { key: 'nehru', aliases: ['nehru'], label: 'Nehru' },
     { key: 'kurta', aliases: ['kurta'], label: 'Kurta' },
@@ -68,6 +72,7 @@ const FIELD_DEFINITIONS: MeasurementFieldDefinition[] = [
 const ROW_GROUPS = [
     ['sleeve', 'sleeve round', 'cuff'],
     ['half sleeve', 'half round'],
+    ['front a', 'front b', 'front c'],
 ] as const;
 
 export const measurementBaseFields = {
@@ -75,7 +80,7 @@ export const measurementBaseFields = {
     pant: ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom', 'kata', 'backup', 'back pocket', 'mobile pocket'],
     kurta: [...TOP_MEASUREMENT_FIELDS],
     suit: [...TOP_MEASUREMENT_FIELDS],
-    vest: ['length', 'shoulder', 'neck', 'chest', 'stomach', 'waist', 'front', 'loosing'],
+    vest: ['length', 'shoulder', 'neck', 'chest', 'stomach', 'waist', 'front a', 'front b', 'front c', 'loosing'],
     customTop: [...TOP_MEASUREMENT_FIELDS],
     customBottom: ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom', 'kata', 'backup', 'back pocket', 'mobile pocket'],
 } as const;
@@ -104,7 +109,7 @@ const SECTION_DEFINITIONS = [
     {
         key: 'body',
         title: 'Body Fit',
-        fields: ['chest', 'stomach', 'waist', 'hip', 'thigh', 'knee', 'bottom', 'front', 'kata', 'backup', 'back pocket', 'mobile pocket'],
+        fields: ['chest', 'stomach', 'waist', 'hip', 'thigh', 'knee', 'bottom', 'front a', 'front b', 'front c', 'kata', 'backup', 'back pocket', 'mobile pocket'],
     },
     {
         key: 'style',
@@ -277,6 +282,14 @@ export const formatMeasurementLabel = (field: string) => {
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join(' ');
 };
+
+export const isFrontMeasurementField = (field: string) => {
+    const canonicalField = getCanonicalMeasurementField(field);
+    return canonicalField === 'front a' || canonicalField === 'front b' || canonicalField === 'front c';
+};
+
+export const isFrontMeasurementRow = (row: ReadonlyArray<string>) =>
+    row.length === 3 && row.every((field) => isFrontMeasurementField(field));
 
 export const getMeasurementNotes = (data?: Record<string, any>) => {
     const value = data?.notes;

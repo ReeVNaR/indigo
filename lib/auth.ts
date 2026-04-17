@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server';
 import crypto from 'crypto';
 
 const SECRET = process.env.AUTH_SECRET || 'dadashri-designers-secret-key-2024';
+const DEV_AUTH_BYPASS =
+    process.env.NODE_ENV !== 'production' &&
+    process.env.DEV_AUTH_BYPASS === 'true';
 
 /**
  * Verifies a signed token. Returns the email if valid, null if invalid/expired.
@@ -33,11 +36,16 @@ export function verifyToken(token: string): string | null {
     }
 }
 
+export function isDevAuthBypassed(): boolean {
+    return DEV_AUTH_BYPASS;
+}
+
 /**
  * Middleware-like check for API routes. 
  * Returns true if authenticated, false otherwise.
  */
 export function isAuthenticated(req: NextRequest): boolean {
+    if (DEV_AUTH_BYPASS) return true;
     const token = req.cookies.get('session_token')?.value;
     if (!token) return false;
     return !!verifyToken(token);

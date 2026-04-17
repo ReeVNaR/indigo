@@ -16,6 +16,7 @@ import {
     getMeasurementNotes,
     getMeasurementFieldRows,
     getMeasurementValue,
+    isFrontMeasurementRow,
     isMeasurementComplete,
     measurementBaseFields,
     measurementOptionalFields,
@@ -371,7 +372,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                     </div>
                     <div className="text-center">
                         <h4 className="text-xl font-bold text-[#131c3f] tracking-tight">{newOrderForm.customerData.name}</h4>
-                        <p className="text-sm text-slate-500 font-medium">{newOrderForm.customerData.phone || 'No phone number'}</p>
+                        <p className="text-sm text-slate-700 font-semibold">{newOrderForm.customerData.phone || 'No phone number'}</p>
                     </div>
                     <button
                         onClick={() => { setNewOrderForm(p => ({ ...p, customerId: null })); setCustomerSearchQuery(''); }}
@@ -472,7 +473,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                         </div>
                                         <div>
                                             <p className="text-base font-bold text-[#131c3f]">{c.name}</p>
-                                            <p className="text-xs text-slate-500 font-medium">{c.phone || 'No phone'}</p>
+                                            <p className="text-xs text-slate-700 font-semibold">{c.phone || 'No phone'}</p>
                                         </div>
                                     </div>
                                     <ChevronRight className={`w-5 h-5 transition-all duration-200 ${focusedSuggestionIndex === idx ? 'text-amber-500 translate-x-1' : 'text-slate-400 group-hover:text-amber-500 group-hover:translate-x-1'}`} />
@@ -965,6 +966,38 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                         )}
                                         <div className="space-y-2">
                                             {getMeasurementFieldRows(visibleFields, currentMeasures).map(row => (
+                                                isFrontMeasurementRow(row) ? (
+                                                    <div
+                                                        key={row.join('|')}
+                                                        className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 gap-y-2 border-b border-stone-100 py-2"
+                                                    >
+                                                        <label className="min-w-0 text-[10px] font-black text-slate-600 uppercase tracking-wide">Front</label>
+                                                        {row.map(field => (
+                                                            <div key={field} className="flex items-center justify-end gap-1 group shrink-0">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.125"
+                                                                    value={getMeasurementValue(currentMeasures, field) || ''}
+                                                                    onChange={e => {
+                                                                        const val = e.target.value;
+                                                                        setNewOrderForm(prev => ({
+                                                                            ...prev,
+                                                                            measurements: {
+                                                                                ...prev.measurements,
+                                                                                [type!]: {
+                                                                                    ...((prev.measurements?.[type as keyof Customer['measurements']] as any) || {}),
+                                                                                    [field]: val
+                                                                                }
+                                                                            }
+                                                                        }));
+                                                                    }}
+                                                                    className="h-8 w-[56px] rounded-md border border-stone-200 bg-white px-2 text-right text-xs font-black text-[#131b2e] shadow-[0_1px_2px_rgba(15,23,42,0.08)] outline-none transition-all focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+                                                                />
+                                                                <span className="text-[10px] font-bold text-slate-600">&quot;</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
                                                 <div
                                                     key={row.join('|')}
                                                     className={`${row.length === 3
@@ -976,7 +1009,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                 >
                                                     {row.map(field => (
                                                         <React.Fragment key={field}>
-                                                            <label className="min-w-0 text-[10px] font-black text-slate-400 uppercase tracking-wide">{formatMeasurementLabel(field)}</label>
+                                                            <label className="min-w-0 text-[10px] font-black text-slate-600 uppercase tracking-wide">{formatMeasurementLabel(field)}</label>
                                                             <div className="flex items-center justify-end gap-1 group shrink-0">
                                                                 <input
                                                                     type="number"
@@ -997,7 +1030,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                     }}
                                                                     className="h-8 w-[56px] rounded-md border border-stone-200 bg-white px-2 text-right text-xs font-black text-[#131b2e] shadow-[0_1px_2px_rgba(15,23,42,0.08)] outline-none transition-all focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
                                                                 />
-                                                                <span className="text-[10px] font-bold text-slate-400">&quot;</span>
+                                                                <span className="text-[10px] font-bold text-slate-600">&quot;</span>
                                                                 {extraFields.includes(field) && (
                                                                     <button
                                                                         onClick={() => {
@@ -1020,6 +1053,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                         </React.Fragment>
                                                     ))}
                                                 </div>
+                                                )
                                             ))}
                                         </div>
 
@@ -1071,7 +1105,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                             ) : (
                                                 <button
                                                     onClick={() => setIsAddingExtraField(true)}
-                                                    className="w-full py-2 border border-dashed rounded text-[9px] font-black uppercase text-slate-400 flex items-center justify-center gap-1.5 hover:text-[#131b2e] hover:border-[#131b2e] transition-all"
+                                                    className="w-full py-2 border border-dashed rounded text-[9px] font-black uppercase text-slate-600 flex items-center justify-center gap-1.5 hover:text-[#131b2e] hover:border-[#131b2e] transition-all"
                                                 >
                                                     <Plus className="w-3 h-3" /> Add Extra Point
                                                 </button>
@@ -1080,7 +1114,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                         {optionalFields.length > 0 && (
                                             <div className="pt-1">
                                                 <div className="border border-dashed border-stone-200 rounded p-3">
-                                                    <label className="mb-2 block text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                    <label className="mb-2 block text-[9px] font-black text-slate-700 uppercase tracking-widest">
                                                         Optional Measurements
                                                     </label>
                                                     <div className="flex flex-wrap gap-2">
@@ -1113,9 +1147,11 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                             }
                                                                         }));
                                                                     }}
-                                                                    className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${enabled ? 'border-[#131b2e] bg-[#131b2e] text-white' : 'border-stone-200 bg-white text-slate-500 hover:border-[#131b2e] hover:text-[#131b2e]'}`}
+                                                                    className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${enabled ? 'border-[#131b2e] bg-[#131b2e] text-white' : 'border-stone-200 bg-white text-slate-700 hover:border-[#131b2e] hover:text-[#131b2e]'}`}
                                                                 >
-                                                                    <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border text-[9px] ${enabled ? 'border-white/60 bg-white/10 text-white' : 'border-stone-300 text-transparent'}`}>✓</span>
+                                                                    <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border text-[9px] ${enabled ? 'border-white/60 bg-white/10 text-white' : 'border-stone-300 text-transparent'}`}>
+                                                                        <Check className="w-2.5 h-2.5" />
+                                                                    </span>
                                                                     {formatMeasurementLabel(field)}
                                                                 </button>
                                                             );
@@ -1126,7 +1162,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                         )}
                                         <div className="pt-1">
                                             <div className="border border-dashed border-stone-200 rounded p-3">
-                                                <label className="mb-2 block text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                <label className="mb-2 block text-[9px] font-black text-slate-700 uppercase tracking-widest">
                                                     Add Notes
                                                 </label>
                                                 <textarea
