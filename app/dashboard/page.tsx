@@ -24,7 +24,8 @@ import {
     Calendar,
     Eye,
     EyeOff,
-    Check
+    Check,
+    WifiOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -75,6 +76,14 @@ import {
     measurementOptionalFields,
     getVisibleMeasurementFields,
 } from '@/lib/measurement-layout';
+import {
+    deleteCustomerFromCache,
+    getCachedCustomers,
+    replaceCustomerCache,
+    upsertCustomerCache,
+} from '@/lib/customer-cache';
+
+const AUTH_CACHE_KEY = 'indigo-dashboard-authenticated';
 
 // --- Icons & Helpers ---
 const SidebarIcon = ({ name, active }: { name: string; active?: boolean }) => {
@@ -231,10 +240,24 @@ export default function Dashboard() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [adminAuthForm, setAdminAuthForm] = useState({ email: '', password: '' });
     const [showAdminPassword, setShowAdminPassword] = useState(false);
+    const [isOfflineMode, setIsOfflineMode] = useState(false);
 
     // -- History-aware tab navigation --
     const isPopstateRef = useRef(false);
     const activeTabRef = useRef('dashboard');
+
+    useEffect(() => {
+        const updateConnectionState = () => setIsOfflineMode(!navigator.onLine);
+
+        updateConnectionState();
+        window.addEventListener('online', updateConnectionState);
+        window.addEventListener('offline', updateConnectionState);
+
+        return () => {
+            window.removeEventListener('online', updateConnectionState);
+            window.removeEventListener('offline', updateConnectionState);
+        };
+    }, []);
 
     const setActiveTab = useCallback((tab: string) => {
         setActiveTabRaw(tab);
@@ -266,20 +289,35 @@ export default function Dashboard() {
     useEffect(() => {
         const checkAuth = async () => {
             try {
+                if (isOfflineMode) {
+                    const cachedAuth = window.localStorage.getItem(AUTH_CACHE_KEY);
+                    if (cachedAuth === 'true') {
+                        setIsAuthenticated(true);
+                        window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
+                        return;
+                    }
+                }
+
                 const res = await fetch('/api/auth');
                 if (!res.ok) {
                     router.push('/');
                     return;
                 }
+                window.localStorage.setItem(AUTH_CACHE_KEY, 'true');
                 setIsAuthenticated(true);
                 // Replace the current history entry with dashboard state so we have a base
                 window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
             } catch {
+                if (isOfflineMode && window.localStorage.getItem(AUTH_CACHE_KEY) === 'true') {
+                    setIsAuthenticated(true);
+                    window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
+                    return;
+                }
                 router.push('/');
             }
         };
         checkAuth();
-    }, [router]);
+    }, [router, isOfflineMode]);
 
     // -- Data Fetching (only after auth is confirmed) --
     useEffect(() => {
@@ -289,45 +327,60 @@ export default function Dashboard() {
             setIsLoading(true);
             setFetchError(null);
             try {
-                // Fetch Orders
-                const ordersRes = await fetch('/api/orders');
-                if (ordersRes.status === 401) {
-                    router.push('/');
-                    return;
-                }
-                if (!ordersRes.ok) throw new Error('Failed to fetch orders');
-                const ordersData = await ordersRes.json();
+                let formattedOrders: Order[] = [];
+                let customersData: Customer[] = [];
 
-                const formattedOrders: Order[] = (ordersData || []).map((order: any) => ({
-                    ...order,
-                    initial: order.customerName ? order.customerName.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) : 'XX',
-                    amount: Number(order.amount)
-                }));
+                if (!isOfflineMode) {
+                    const ordersRes = await fetch('/api/orders');
+                    if (ordersRes.status === 401) {
+                        router.push('/');
+                        return;
+                    }
+                    if (!ordersRes.ok) throw new Error('Failed to fetch orders');
+                    const ordersJson = await ordersRes.json();
+                    formattedOrders = (ordersJson || []).map((order: any) => ({
+                        ...order,
+                        initial: order.customerName ? order.customerName.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2) : 'XX',
+                        amount: Number(order.amount)
+                    }));
 
-                // Fetch Customers
-                const customersRes = await fetch('/api/customers');
-                if (!customersRes.ok) throw new Error('Failed to fetch customers');
-                const customersData = await customersRes.json();
+                    try {
+                        const customersRes = await fetch('/api/customers');
+                        if (!customersRes.ok) throw new Error('Failed to fetch customers');
+                        customersData = await customersRes.json();
+                        await replaceCustomerCache(customersData || []);
+                    } catch (customerError) {
+                        customersData = await getCachedCustomers();
+                        if (!customersData.length) throw customerError;
+                    }
 
-                // Fetch Admin Auth
-                const adminRes = await fetch('/api/auth/admin');
-                if (adminRes.ok) {
-                    const adminData = await adminRes.json();
-                    setAdminAuthForm(p => ({ ...p, email: adminData.email }));
+                    const adminRes = await fetch('/api/auth/admin');
+                    if (adminRes.ok) {
+                        const adminData = await adminRes.json();
+                        setAdminAuthForm(p => ({ ...p, email: adminData.email }));
+                    }
+                } else {
+                    customersData = await getCachedCustomers();
                 }
 
                 setOrders(formattedOrders);
                 setCustomers(customersData || []);
             } catch (error: any) {
                 console.error('Data Fetch Error:', error);
-                setFetchError(error.message || 'Failed to connect to the database. Please ensure MongoDB is running and your MONGODB_URI is set.');
+                if (!isOfflineMode) {
+                    setFetchError(error.message || 'Failed to connect to the database. Please ensure MongoDB is running and your MONGODB_URI is set.');
+                } else {
+                    setFetchError(null);
+                    setOrders([]);
+                    setCustomers(await getCachedCustomers().catch(() => []));
+                }
             } finally {
                 setIsLoading(false);
             }
         };
 
         fetchData();
-    }, [isAuthenticated, router]);
+    }, [isAuthenticated, router, isOfflineMode]);
 
     // -- Global Search and Filtered Orders --
     const filteredOrders = useMemo(() => {
@@ -460,6 +513,7 @@ export default function Dashboard() {
             const res = await fetch(`/api/customers?id=${id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Failed to delete customer');
             setCustomers(customers.filter(c => c.id !== id));
+            void deleteCustomerFromCache(id);
             if (selectedCustomerId === id) {
                 setSelectedCustomerId(null);
                 setActiveTab('customers');
@@ -507,9 +561,13 @@ export default function Dashboard() {
 
             if (!res.ok) throw new Error('Failed to update customer');
 
+            const currentCustomer = customers.find(c => c.id === selectedCustomerId);
+            const updatedCustomer = currentCustomer ? { ...currentCustomer, ...editCustomerForm } : null;
+
             setCustomers(prev => prev.map(c =>
                 c.id === selectedCustomerId ? { ...c, ...editCustomerForm } : c
             ));
+            if (updatedCustomer) void upsertCustomerCache(updatedCustomer);
             setIsEditCustomerModalOpen(false);
             alert("Customer profile updated successfully!");
         } catch (error) {
@@ -612,6 +670,7 @@ export default function Dashboard() {
             setCustomers((prev) => prev.map((current) =>
                 current.id === customer.id ? { ...current, ledgerEntries } : current
             ));
+            void upsertCustomerCache({ ...customer, ledgerEntries });
             resetCustomerLedgerForm();
         } catch (error) {
             console.error('Error saving customer ledger entry:', error);
@@ -648,6 +707,7 @@ export default function Dashboard() {
             setCustomers((prev) => prev.map((current) =>
                 current.id === customer.id ? { ...current, ledgerEntries } : current
             ));
+            void upsertCustomerCache({ ...customer, ledgerEntries });
             if (editingCustomerLedgerId === entryId) resetCustomerLedgerForm();
             setCustomerLedgerDeleteTarget(null);
         } catch (error) {
@@ -713,9 +773,11 @@ export default function Dashboard() {
 
             if (!res.ok) throw new Error('Failed to save measurements');
 
+            const updatedCustomer = { ...customer, measurements: updatedMeasurements, measurementHistory: updatedHistory as any };
             setCustomers(prev => prev.map(c =>
-                c.id === selectedCustomerId ? { ...c, measurements: updatedMeasurements, measurementHistory: updatedHistory as any } : c
+                c.id === selectedCustomerId ? updatedCustomer : c
             ));
+            void upsertCustomerCache(updatedCustomer);
             setEditingMeasurementGarment(null);
             setEditingCustomGarmentId(null);
             setCustomGarmentName('');
@@ -730,11 +792,13 @@ export default function Dashboard() {
         setOrders([newOrder, ...orders]);
         if (newCustomer) {
             setCustomers([newCustomer, ...customers]);
+            void upsertCustomerCache(newCustomer);
         }
     };
 
     const handleCustomerCreated = (newCustomer: Customer) => {
         setCustomers([newCustomer, ...customers]);
+        void upsertCustomerCache(newCustomer);
     };
 
     // Close menus when clicking outside
@@ -751,6 +815,7 @@ export default function Dashboard() {
         } catch (error) {
             console.error('Logout error:', error);
         }
+        window.localStorage.removeItem(AUTH_CACHE_KEY);
         router.push('/');
     };
 
@@ -935,6 +1000,12 @@ export default function Dashboard() {
                     </div>
                 ) : (
                     <div className="relative z-10 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8 pb-32 pt-20 lg:pt-8">
+                        {isOfflineMode && (
+                            <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-amber-800 shadow-sm">
+                                <WifiOff className="h-3.5 w-3.5" />
+                                <span>Offline Mode - Viewing Saved Data Only</span>
+                            </div>
+                        )}
 
                         {/* Header */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
