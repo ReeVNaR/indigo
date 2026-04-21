@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display, Great_Vibes, Cormorant_Garamond } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import PwaRegister from "@/components/pwa-register";
 
@@ -46,6 +47,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script id="offline-auth-restore" strategy="beforeInteractive">{`
+          (function () {
+            try {
+              if (typeof window === 'undefined' || window.navigator.onLine) return;
+              if (window.location.pathname !== '/') return;
+              if (window.localStorage.getItem('indigo-dashboard-authenticated') === 'true') {
+                window.location.replace('/dashboard');
+              }
+            } catch (_) {}
+          })();
+        `}</Script>
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${greatVibes.variable} ${cormorant.variable} antialiased`}
       >

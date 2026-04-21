@@ -79,6 +79,16 @@ export default function Home() {
     setError("");
 
     try {
+      if (!navigator.onLine) {
+        if (window.localStorage.getItem(OFFLINE_AUTH_CACHE_KEY) === 'true') {
+          router.replace("/dashboard");
+          return;
+        }
+
+        setError('Offline mode is available after a successful online login.');
+        return;
+      }
+
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
