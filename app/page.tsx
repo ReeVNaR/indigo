@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
+import { OFFLINE_AUTH_CACHE_KEY } from '@/lib/offline';
 
 // --- Icons ---
 
@@ -63,6 +64,14 @@ export default function Home() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState("");
   const [resetSuccess, setResetSuccess] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (navigator.onLine) return;
+    if (window.localStorage.getItem(OFFLINE_AUTH_CACHE_KEY) === 'true') {
+      router.replace('/dashboard');
+    }
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

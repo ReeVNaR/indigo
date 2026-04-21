@@ -1,0 +1,19 @@
+{
+  "name": "Dadashri Designers",
+  "short_name": "Dadashri",
+  "description": "Tailoring workshop management with offline read-only support.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d121f",
+  "theme_color": "#0d121f",
+  "icons": [
+    {
+      "src": "/Logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

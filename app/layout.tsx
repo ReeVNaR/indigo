@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display, Great_Vibes, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
+import PwaRegister from "@/components/pwa-register";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +31,8 @@ const cormorant = Cormorant_Garamond({
 
 export const metadata: Metadata = {
   title: "Dadashri Designers",
-  description: "Couture • Fashion • Quality — Tailoring Workshop Management",
+  description: "Couture â€¢ Fashion â€¢ Quality â€” Tailoring Workshop Management",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: "/Logo.png",
     apple: "/Logo.png",
@@ -47,6 +49,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} ${greatVibes.variable} ${cormorant.variable} antialiased`}
       >
+        <PwaRegister />
         {children}
       </body>
     </html>

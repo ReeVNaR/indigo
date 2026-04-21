@@ -82,8 +82,7 @@ import {
     replaceCustomerCache,
     upsertCustomerCache,
 } from '@/lib/customer-cache';
-
-const AUTH_CACHE_KEY = 'indigo-dashboard-authenticated';
+import { OFFLINE_AUTH_CACHE_KEY } from '@/lib/offline';
 
 // --- Icons & Helpers ---
 const SidebarIcon = ({ name, active }: { name: string; active?: boolean }) => {
@@ -290,7 +289,7 @@ export default function Dashboard() {
         const checkAuth = async () => {
             try {
                 if (isOfflineMode) {
-                    const cachedAuth = window.localStorage.getItem(AUTH_CACHE_KEY);
+                    const cachedAuth = window.localStorage.getItem(OFFLINE_AUTH_CACHE_KEY);
                     if (cachedAuth === 'true') {
                         setIsAuthenticated(true);
                         window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
@@ -303,12 +302,12 @@ export default function Dashboard() {
                     router.push('/');
                     return;
                 }
-                window.localStorage.setItem(AUTH_CACHE_KEY, 'true');
+                window.localStorage.setItem(OFFLINE_AUTH_CACHE_KEY, 'true');
                 setIsAuthenticated(true);
                 // Replace the current history entry with dashboard state so we have a base
                 window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
             } catch {
-                if (isOfflineMode && window.localStorage.getItem(AUTH_CACHE_KEY) === 'true') {
+                if (isOfflineMode && window.localStorage.getItem(OFFLINE_AUTH_CACHE_KEY) === 'true') {
                     setIsAuthenticated(true);
                     window.history.replaceState({ tab: 'dashboard' }, '', '/dashboard');
                     return;
@@ -815,7 +814,7 @@ export default function Dashboard() {
         } catch (error) {
             console.error('Logout error:', error);
         }
-        window.localStorage.removeItem(AUTH_CACHE_KEY);
+        window.localStorage.removeItem(OFFLINE_AUTH_CACHE_KEY);
         router.push('/');
     };
 
