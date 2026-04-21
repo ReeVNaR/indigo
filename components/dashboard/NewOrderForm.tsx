@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Customer, Order, OrderStatus } from '@/lib/types';
+import { upsertCustomerCache } from '@/lib/customer-cache';
 import {
     formatMeasurementLabel,
     getEnabledOptionalMeasurementFields,
@@ -336,7 +337,7 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
 
             // Sync measurements to customer profile
             if (newOrderForm.measurements && Object.keys(newOrderForm.measurements).length > 0) {
-                await fetch('/api/customers', {
+                const measurementRes = await fetch('/api/customers', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -344,6 +345,18 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                         measurements: newOrderForm.measurements
                     })
                 });
+
+                if (measurementRes.ok) {
+                    const cachedCustomer = customers.find(customer => customer.id === finalCustomerId) || newCustomer;
+                    if (cachedCustomer) {
+                        void upsertCustomerCache({
+                            ...cachedCustomer,
+                            measurements: newOrderForm.measurements
+                        });
+                    }
+                } else {
+                    console.warn('Measurement sync failed, continuing with order save.');
+                }
             }
 
             onOrderCreated(newOrder, newCustomer);
