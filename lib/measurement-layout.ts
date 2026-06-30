@@ -29,6 +29,8 @@ const TOP_MEASUREMENT_FIELDS = [
 const TOP_OPTIONAL_MEASUREMENT_FIELDS = ['nehru', 'kurta', 'safari'] as const;
 
 const FIELD_DEFINITIONS: MeasurementFieldDefinition[] = [
+    { key: 'cut', aliases: ['cut'], label: 'Cut' },
+    { key: 'bush', aliases: ['bush', 'bush cut'], label: 'Bush' },
     { key: 'length', aliases: ['length', 'len'], label: 'Len' },
     { key: 'shoulder', aliases: ['shoulder'], label: 'Shoulder' },
     { key: 'sleeve', aliases: ['sleeve', 'sleeves'], label: 'Sleeves' },
@@ -69,6 +71,19 @@ const FIELD_DEFINITIONS: MeasurementFieldDefinition[] = [
     { key: 'mobile pocket', aliases: ['mobile pocket', 'mobile-pocket', 'mobilepocket'], label: 'Mobile Pocket' },
 ];
 
+// Fields that are a single mutually-exclusive choice (rendered as radio buttons)
+// rather than a numeric measurement. Keyed by canonical field key.
+export const MEASUREMENT_CHOICE_FIELDS: Record<string, string[]> = {
+    cut: ['Apple Cut', 'Bush Cut', 'Side Cut'],
+};
+
+// Numeric fields that only become visible when a choice field has a specific value
+// (e.g. selecting the "Bush Cut" exposes a "Bush" measurement). `when`/`field` are
+// canonical field keys; `equals` is the selected choice value.
+export const CONDITIONAL_MEASUREMENT_FIELDS: Array<{ when: string; equals: string; field: string }> = [
+    { when: 'cut', equals: 'Bush Cut', field: 'bush' },
+];
+
 const ROW_GROUPS = [
     ['sleeve', 'sleeve round', 'cuff'],
     ['half sleeve', 'half round'],
@@ -76,7 +91,7 @@ const ROW_GROUPS = [
 ] as const;
 
 export const measurementBaseFields = {
-    shirt: [...TOP_MEASUREMENT_FIELDS],
+    shirt: ['cut', ...TOP_MEASUREMENT_FIELDS],
     pant: ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom', 'kata', 'backup', 'back pocket', 'mobile pocket'],
     kurta: [...TOP_MEASUREMENT_FIELDS],
     suit: [...TOP_MEASUREMENT_FIELDS],
@@ -139,6 +154,13 @@ const getCanonicalMeasurementField = (field: string) => getFieldDefinition(field
 const isSameMeasurementField = (first: string, second: string) =>
     getCanonicalMeasurementField(first) === getCanonicalMeasurementField(second);
 
+export const getMeasurementChoiceOptions = (field: string): string[] | null => {
+    const canonicalField = getCanonicalMeasurementField(field);
+    return MEASUREMENT_CHOICE_FIELDS[canonicalField] ?? null;
+};
+
+export const isMeasurementChoiceField = (field: string) => getMeasurementChoiceOptions(field) !== null;
+
 const getFieldPriority = (field: string) => {
     const canonicalField = getCanonicalMeasurementField(field);
     const matchIndex = FIELD_DEFINITIONS.findIndex((definition) => definition.key === canonicalField);
@@ -155,6 +177,11 @@ export const getMeasurementValue = (data: Record<string, any> | undefined, field
 
     return matchingKey ? data[matchingKey] : '';
 };
+
+export const getConditionalMeasurementFields = (data?: Record<string, any>): string[] =>
+    CONDITIONAL_MEASUREMENT_FIELDS
+        .filter((rule) => String(getMeasurementValue(data, rule.when) || '') === rule.equals)
+        .map((rule) => rule.field);
 
 export const getExtraMeasurementFields = (baseFields: ReadonlyArray<string>, data?: Record<string, any>) =>
     Object.keys(data || {}).filter(
@@ -266,8 +293,11 @@ export const getVisibleMeasurementFields = (
 ) => {
     const enabledOptionalFields = getEnabledOptionalMeasurementFields(data);
     const visibleOptionalFields = optionalFields.filter((field) => enabledOptionalFields.includes(field));
+    const conditionalFields = getConditionalMeasurementFields(data).filter(
+        (field) => ![...baseFields, ...visibleOptionalFields].some((existing) => isSameMeasurementField(existing, field))
+    );
 
-    return [...baseFields, ...visibleOptionalFields];
+    return [...baseFields, ...visibleOptionalFields, ...conditionalFields];
 };
 
 export const formatMeasurementLabel = (field: string) => {

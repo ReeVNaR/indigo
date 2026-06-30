@@ -22,6 +22,9 @@ import {
     measurementBaseFields,
     measurementOptionalFields,
     getVisibleMeasurementFields,
+    getMeasurementChoiceOptions,
+    isMeasurementChoiceField,
+    CONDITIONAL_MEASUREMENT_FIELDS,
 } from '@/lib/measurement-layout';
 import {
     Search,
@@ -979,7 +982,44 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                         )}
                                         <div className="space-y-2">
                                             {getMeasurementFieldRows(visibleFields, currentMeasures).map(row => (
-                                                isFrontMeasurementRow(row) ? (
+                                                row.length === 1 && isMeasurementChoiceField(row[0]) ? (
+                                                    <div
+                                                        key={row[0]}
+                                                        className="flex items-center justify-between gap-3 flex-wrap border-b border-stone-100 py-2"
+                                                    >
+                                                        <label className="text-[10px] font-black text-slate-600 uppercase tracking-wide">{formatMeasurementLabel(row[0])}</label>
+                                                        <div className="flex flex-wrap gap-3 justify-end">
+                                                            {getMeasurementChoiceOptions(row[0])!.map(option => (
+                                                                <label key={option} className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-slate-700 uppercase tracking-wide">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`order-measure-choice-${type}-${row[0]}`}
+                                                                        value={option}
+                                                                        checked={String(getMeasurementValue(currentMeasures, row[0]) || '') === option}
+                                                                        onChange={() => setNewOrderForm(prev => {
+                                                                            const nextMeasures: any = {
+                                                                                ...((prev.measurements?.[type as keyof Customer['measurements']] as any) || {}),
+                                                                                [row[0]]: option
+                                                                            };
+                                                                            CONDITIONAL_MEASUREMENT_FIELDS.forEach((rule) => {
+                                                                                if (rule.when === row[0] && option !== rule.equals) delete nextMeasures[rule.field];
+                                                                            });
+                                                                            return {
+                                                                                ...prev,
+                                                                                measurements: {
+                                                                                    ...prev.measurements,
+                                                                                    [type!]: nextMeasures
+                                                                                }
+                                                                            };
+                                                                        })}
+                                                                        className="h-3.5 w-3.5 accent-orange-500"
+                                                                    />
+                                                                    {option}
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ) : isFrontMeasurementRow(row) ? (
                                                     <div
                                                         key={row.join('|')}
                                                         className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 gap-y-2 border-b border-stone-100 py-2"

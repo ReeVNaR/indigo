@@ -75,6 +75,9 @@ import {
     measurementBaseFields,
     measurementOptionalFields,
     getVisibleMeasurementFields,
+    getMeasurementChoiceOptions,
+    isMeasurementChoiceField,
+    CONDITIONAL_MEASUREMENT_FIELDS,
 } from '@/lib/measurement-layout';
 import {
     deleteCustomerFromCache,
@@ -117,8 +120,10 @@ const ArrowRightIcon = () => (
     </svg>
 );
 
-const formatMeasurementValue = (value: any) => {
+const formatMeasurementValue = (value: any, field?: string) => {
     if (value === undefined || value === null || String(value).trim() === '') return '--';
+    // Choice fields (e.g. shirt "Cut") store a label, not an inches value.
+    if (field && isMeasurementChoiceField(field)) return String(value);
     return `${value}"`;
 };
 
@@ -1400,7 +1405,7 @@ export default function Dashboard() {
                                                                                                 <div className="flex items-center gap-3 shrink-0">
                                                                                                     {row.map((field) => (
                                                                                                         <span key={field} className="shrink-0 whitespace-nowrap text-xs font-black text-gray-700">
-                                                                                                            {formatMeasurementValue(getMeasurementValue(garment.data, field))}
+                                                                                                            {formatMeasurementValue(getMeasurementValue(garment.data, field), field)}
                                                                                                         </span>
                                                                                                     ))}
                                                                                                 </div>
@@ -1423,7 +1428,7 @@ export default function Dashboard() {
                                                                                                         {formatMeasurementLabel(field)}
                                                                                                     </span>
                                                                                                     <span className="shrink-0 whitespace-nowrap text-xs font-black text-gray-700">
-                                                                                                        {formatMeasurementValue(getMeasurementValue(garment.data, field))}
+                                                                                                        {formatMeasurementValue(getMeasurementValue(garment.data, field), field)}
                                                                                                     </span>
                                                                                                 </div>
                                                                                             ))}
@@ -2046,7 +2051,7 @@ export default function Dashboard() {
                                                                                         <div className="flex items-center gap-3">
                                                                                             {row.map((field) => (
                                                                                                 <span key={field} className="text-xs font-black text-slate-800">
-                                                                                                    {formatMeasurementValue(getMeasurementValue(data, field))}
+                                                                                                    {formatMeasurementValue(getMeasurementValue(data, field), field)}
                                                                                                 </span>
                                                                                             ))}
                                                                                         </div>
@@ -2059,7 +2064,7 @@ export default function Dashboard() {
                                                                                         {row.map((field) => (
                                                                                             <div key={field} className="flex justify-between gap-2">
                                                                                                 <span className="text-[10px] font-bold text-slate-500">{formatMeasurementLabel(field)}</span>
-                                                                                                <span className="text-xs font-black text-slate-800">{formatMeasurementValue(getMeasurementValue(data, field))}</span>
+                                                                                                <span className="text-xs font-black text-slate-800">{formatMeasurementValue(getMeasurementValue(data, field), field)}</span>
                                                                                             </div>
                                                                                         ))}
                                                                                     </div>
@@ -2295,7 +2300,7 @@ export default function Dashboard() {
                                             </span>
                                             {row.map((field) => (
                                                 <span key={field} className="text-right text-sm font-black text-gray-900">
-                                                    {formatMeasurementValue(getMeasurementValue(viewingMeasurementGarment.data, field))}
+                                                    {formatMeasurementValue(getMeasurementValue(viewingMeasurementGarment.data, field), field)}
                                                 </span>
                                             ))}
                                         </div>
@@ -2315,7 +2320,7 @@ export default function Dashboard() {
                                                         {formatMeasurementLabel(field)}
                                                     </span>
                                                     <span className="text-right text-sm font-black text-gray-900">
-                                                        {formatMeasurementValue(getMeasurementValue(viewingMeasurementGarment.data, field))}
+                                                        {formatMeasurementValue(getMeasurementValue(viewingMeasurementGarment.data, field), field)}
                                                     </span>
                                                 </React.Fragment>
                                             ))}
@@ -2425,7 +2430,37 @@ export default function Dashboard() {
                                 return (
                                     <>
                                         {getMeasurementFieldRows(visibleFields, measurementForm).map((row) => (
-                                    isFrontMeasurementRow(row) ? (
+                                    row.length === 1 && isMeasurementChoiceField(row[0]) ? (
+                                        <div
+                                            key={row[0]}
+                                            className="border-b border-stone-100 py-2 last:border-none flex items-center justify-between gap-3 flex-wrap"
+                                        >
+                                            <label className="text-[10px] font-black text-gray-600 uppercase tracking-wide">
+                                                {formatMeasurementLabel(row[0])}
+                                            </label>
+                                            <div className="flex flex-wrap gap-3 justify-end">
+                                                {getMeasurementChoiceOptions(row[0])!.map((option) => (
+                                                    <label key={option} className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-gray-700 uppercase tracking-wide">
+                                                        <input
+                                                            type="radio"
+                                                            name={`measure-choice-${row[0]}`}
+                                                            value={option}
+                                                            checked={String(getMeasurementValue(measurementForm, row[0]) || '') === option}
+                                                            onChange={() => setMeasurementForm((prev: any) => {
+                                                                const next: any = { ...prev, [row[0]]: option };
+                                                                CONDITIONAL_MEASUREMENT_FIELDS.forEach((rule) => {
+                                                                    if (rule.when === row[0] && option !== rule.equals) delete next[rule.field];
+                                                                });
+                                                                return next;
+                                                            })}
+                                                            className="h-3.5 w-3.5 accent-orange-500"
+                                                        />
+                                                        {option}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : isFrontMeasurementRow(row) ? (
                                         <div
                                             key={row.join('|')}
                                             className="border-b border-stone-100 py-2 last:border-none grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-3 gap-y-2"
