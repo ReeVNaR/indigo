@@ -77,7 +77,6 @@ import {
     getVisibleMeasurementFields,
     getMeasurementChoiceOptions,
     isMeasurementChoiceField,
-    CONDITIONAL_MEASUREMENT_FIELDS,
 } from '@/lib/measurement-layout';
 import {
     deleteCustomerFromCache,
@@ -2446,13 +2445,7 @@ export default function Dashboard() {
                                                             name={`measure-choice-${row[0]}`}
                                                             value={option}
                                                             checked={String(getMeasurementValue(measurementForm, row[0]) || '') === option}
-                                                            onChange={() => setMeasurementForm((prev: any) => {
-                                                                const next: any = { ...prev, [row[0]]: option };
-                                                                CONDITIONAL_MEASUREMENT_FIELDS.forEach((rule) => {
-                                                                    if (rule.when === row[0] && option !== rule.equals) delete next[rule.field];
-                                                                });
-                                                                return next;
-                                                            })}
+                                                            onChange={() => setMeasurementForm((prev: any) => ({ ...prev, [row[0]]: option }))}
                                                             className="h-3.5 w-3.5 accent-orange-500"
                                                         />
                                                         {option}

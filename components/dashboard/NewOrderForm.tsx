@@ -24,7 +24,6 @@ import {
     getVisibleMeasurementFields,
     getMeasurementChoiceOptions,
     isMeasurementChoiceField,
-    CONDITIONAL_MEASUREMENT_FIELDS,
 } from '@/lib/measurement-layout';
 import {
     Search,
@@ -996,22 +995,16 @@ export default function NewOrderForm({ isOpen, onOpenChange, onOrderCreated, cus
                                                                         name={`order-measure-choice-${type}-${row[0]}`}
                                                                         value={option}
                                                                         checked={String(getMeasurementValue(currentMeasures, row[0]) || '') === option}
-                                                                        onChange={() => setNewOrderForm(prev => {
-                                                                            const nextMeasures: any = {
-                                                                                ...((prev.measurements?.[type as keyof Customer['measurements']] as any) || {}),
-                                                                                [row[0]]: option
-                                                                            };
-                                                                            CONDITIONAL_MEASUREMENT_FIELDS.forEach((rule) => {
-                                                                                if (rule.when === row[0] && option !== rule.equals) delete nextMeasures[rule.field];
-                                                                            });
-                                                                            return {
-                                                                                ...prev,
-                                                                                measurements: {
-                                                                                    ...prev.measurements,
-                                                                                    [type!]: nextMeasures
+                                                                        onChange={() => setNewOrderForm(prev => ({
+                                                                            ...prev,
+                                                                            measurements: {
+                                                                                ...prev.measurements,
+                                                                                [type!]: {
+                                                                                    ...((prev.measurements?.[type as keyof Customer['measurements']] as any) || {}),
+                                                                                    [row[0]]: option
                                                                                 }
-                                                                            };
-                                                                        })}
+                                                                            }
+                                                                        }))}
                                                                         className="h-3.5 w-3.5 accent-orange-500"
                                                                     />
                                                                     {option}
