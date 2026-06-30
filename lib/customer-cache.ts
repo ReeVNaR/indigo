@@ -14,7 +14,7 @@ function openDatabase(): Promise<IDBDatabase | null> {
     if (!isIndexedDBAvailable()) return Promise.resolve(null);
 
     if (!dbPromise) {
-        dbPromise = new Promise((resolve, reject) => {
+        dbPromise = new Promise<IDBDatabase | null>((resolve, reject) => {
             const request = indexedDB.open(DB_NAME, DB_VERSION);
 
             request.onupgradeneeded = () => {
