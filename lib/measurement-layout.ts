@@ -30,6 +30,7 @@ const TOP_OPTIONAL_MEASUREMENT_FIELDS = ['nehru', 'kurta', 'safari'] as const;
 
 const FIELD_DEFINITIONS: MeasurementFieldDefinition[] = [
     { key: 'cut', aliases: ['cut'], label: 'Cut' },
+    { key: 'pocket', aliases: ['pocket'], label: 'Pocket' },
     { key: 'length', aliases: ['length', 'len'], label: 'Len' },
     { key: 'shoulder', aliases: ['shoulder'], label: 'Shoulder' },
     { key: 'sleeve', aliases: ['sleeve', 'sleeves'], label: 'Sleeves' },
@@ -74,6 +75,7 @@ const FIELD_DEFINITIONS: MeasurementFieldDefinition[] = [
 // rather than a numeric measurement. Keyed by canonical field key.
 export const MEASUREMENT_CHOICE_FIELDS: Record<string, string[]> = {
     cut: ['Apple Cut', 'Bush Shirt', 'Side Cut'],
+    pocket: ['Cross Pocket', 'Plate Pocket'],
 };
 
 const ROW_GROUPS = [
@@ -84,7 +86,7 @@ const ROW_GROUPS = [
 
 export const measurementBaseFields = {
     shirt: ['cut', ...TOP_MEASUREMENT_FIELDS],
-    pant: ['length', 'waist', 'hip', 'thigh', 'knee', 'bottom', 'kata', 'backup', 'back pocket', 'mobile pocket'],
+    pant: ['pocket', 'length', 'waist', 'hip', 'thigh', 'knee', 'bottom', 'kata', 'backup', 'back pocket', 'mobile pocket'],
     kurta: [...TOP_MEASUREMENT_FIELDS],
     suit: [...TOP_MEASUREMENT_FIELDS],
     vest: ['length', 'shoulder', 'neck', 'chest', 'stomach', 'waist', 'front a', 'front b', 'front c', 'loosing'],
